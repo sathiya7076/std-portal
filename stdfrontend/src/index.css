@@ -1,0 +1,435 @@
+/* ============================================================
+   Smart Training Management System — Design Tokens
+   Palette:
+     --ink        #0F1729  (sidebar / dark surfaces)
+     --ink-soft   #1B2540  (sidebar hover)
+     --canvas     #F5F6FA  (page background)
+     --surface    #FFFFFF  (cards)
+     --indigo     #4F46E5  (primary accent)
+     --indigo-600 #4338CA
+     --teal       #0EA5A4  (progress / success)
+     --amber      #F59E0B  (pending / warning)
+     --coral      #EF4444  (danger / absent)
+     --slate      #64748B  (muted text)
+   Type: "Sora" for display/headings, "Inter" for body & data.
+   ============================================================ */
+
+:root {
+  --ink: #0f1729;
+  --ink-soft: #1b2540;
+  --canvas: #f5f6fa;
+  --surface: #ffffff;
+  --indigo: #4f46e5;
+  --indigo-600: #4338ca;
+  --indigo-100: #eef0fd;
+  --teal: #0ea5a4;
+  --teal-100: #e3f8f7;
+  --amber: #f59e0b;
+  --amber-100: #fef3e0;
+  --coral: #ef4444;
+  --coral-100: #fde9e9;
+  --slate: #64748b;
+  --border: #e6e8f0;
+
+  --font-display: "Sora", "Segoe UI", sans-serif;
+  --font-body: "Inter", "Segoe UI", sans-serif;
+}
+
+body {
+  background: var(--canvas);
+  font-family: var(--font-body);
+  color: #1a2035;
+}
+
+h1, h2, h3, h4, h5, h6, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+/* ---------- App shell ---------- */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-content {
+  flex: 1;
+  padding: 1.75rem;
+}
+
+@media (max-width: 767px) {
+  .app-content {
+    padding: 1rem;
+  }
+}
+
+/* ---------- Sidebar ---------- */
+.stms-sidebar {
+  width: 250px;
+  min-width: 250px;
+  background: var(--ink);
+  color: #cbd3ee;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  transition: transform 0.25s ease;
+  z-index: 1030;
+}
+
+.stms-sidebar .brand {
+  padding: 1.25rem 1.25rem 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.stms-sidebar .brand-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--indigo), var(--teal));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: #fff;
+  font-family: var(--font-display);
+}
+
+.stms-sidebar .brand-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: #fff;
+  font-size: 0.95rem;
+  line-height: 1.1;
+}
+
+.stms-sidebar .brand-sub {
+  font-size: 0.7rem;
+  color: #8891b3;
+}
+
+.stms-nav {
+  padding: 0.75rem 0.75rem;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.stms-nav .nav-link {
+  color: #b7bfe0;
+  border-radius: 10px;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.15rem;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.stms-nav .nav-link i {
+  font-size: 1.05rem;
+  width: 20px;
+  text-align: center;
+}
+
+.stms-nav .nav-link:hover {
+  background: var(--ink-soft);
+  color: #fff;
+}
+
+.stms-nav .nav-link.active {
+  background: var(--indigo);
+  color: #fff;
+}
+
+.stms-sidebar-footer {
+  padding: 0.9rem 1.25rem;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  font-size: 0.75rem;
+  color: #8891b3;
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 41, 0.5);
+  z-index: 1020;
+}
+
+@media (max-width: 991px) {
+  .stms-sidebar {
+    position: fixed;
+    left: 0;
+    transform: translateX(-100%);
+  }
+  .stms-sidebar.open {
+    transform: translateX(0);
+  }
+}
+
+/* ---------- Topbar ---------- */
+.stms-topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 1010;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.breadcrumb-bar {
+  font-size: 0.8rem;
+  color: var(--slate);
+}
+
+/* ---------- Cards ---------- */
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+  height: 100%;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.stat-card:hover {
+  box-shadow: 0 8px 24px rgba(15, 23, 41, 0.06);
+  transform: translateY(-2px);
+}
+
+.stat-card .stat-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  margin-bottom: 0.6rem;
+}
+
+.stat-card .stat-value {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.stat-card .stat-label {
+  color: var(--slate);
+  font-size: 0.82rem;
+  margin-top: 0.25rem;
+}
+
+.bg-indigo-soft { background: var(--indigo-100); color: var(--indigo-600); }
+.bg-teal-soft { background: var(--teal-100); color: var(--teal); }
+.bg-amber-soft { background: var(--amber-100); color: #b45309; }
+.bg-coral-soft { background: var(--coral-100); color: var(--coral); }
+
+.surface-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.btn-primary-stms {
+  background: var(--indigo);
+  border-color: var(--indigo);
+  color: #fff;
+}
+.btn-primary-stms:hover {
+  background: var(--indigo-600);
+  border-color: var(--indigo-600);
+  color: #fff;
+}
+
+.text-indigo { color: var(--indigo); }
+.text-teal { color: var(--teal); }
+
+/* ---------- Progress bars ---------- */
+.stms-progress {
+  height: 8px;
+  border-radius: 99px;
+  background: #eceefb;
+  overflow: hidden;
+}
+.stms-progress > div {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--indigo), var(--teal));
+}
+
+/* ---------- Fingerprint scan ---------- */
+.fingerprint-pad {
+  width: 190px;
+  height: 190px;
+  border-radius: 20px;
+  border: 2px dashed #c7cdea;
+  background: var(--indigo-100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.fingerprint-pad i {
+  font-size: 4.5rem;
+  color: var(--indigo);
+  z-index: 2;
+}
+
+.scan-line {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 3px;
+  background: var(--teal);
+  box-shadow: 0 0 14px 3px var(--teal);
+  animation: scan-move 1.6s ease-in-out infinite;
+  z-index: 3;
+}
+
+@keyframes scan-move {
+  0% { top: 10px; opacity: 0.2; }
+  50% { top: 170px; opacity: 1; }
+  100% { top: 10px; opacity: 0.2; }
+}
+
+.fingerprint-pad.scanned {
+  border-style: solid;
+  border-color: var(--teal);
+  background: var(--teal-100);
+}
+
+/* ---------- Roadmap ---------- */
+.roadmap-track {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.roadmap-node {
+  background: var(--surface);
+  border: 1.5px solid var(--indigo);
+  color: var(--indigo-600);
+  border-radius: 10px;
+  padding: 0.55rem 1.4rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  width: min(320px, 100%);
+  text-align: center;
+}
+
+.roadmap-node.final {
+  background: linear-gradient(135deg, var(--indigo), var(--teal));
+  color: #fff;
+  border: none;
+}
+
+.roadmap-arrow {
+  color: #b7bfe0;
+  font-size: 1.3rem;
+  line-height: 1.4rem;
+}
+
+/* ---------- Empty / error states ---------- */
+.empty-state, .error-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--slate);
+}
+.empty-state i, .error-state i {
+  font-size: 2.4rem;
+  margin-bottom: 0.75rem;
+  display: block;
+}
+.empty-state i { color: #c7cdea; }
+.error-state i { color: var(--coral); }
+
+/* ---------- Misc ---------- */
+.cursor-pointer { cursor: pointer; }
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 20% 20%, #1b2540 0%, var(--ink) 55%, #070c17 100%);
+  padding: 1.5rem;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--surface);
+  border-radius: 18px;
+  padding: 2.25rem 2rem;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.35);
+}
+
+.role-toggle {
+  display: flex;
+  background: var(--canvas);
+  border-radius: 12px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.role-toggle button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0.55rem 0;
+  border-radius: 9px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--slate);
+  transition: all 0.15s ease;
+}
+
+.role-toggle button.active {
+  background: var(--surface);
+  color: var(--indigo-600);
+  box-shadow: 0 2px 8px rgba(15,23,41,0.12);
+}
+
+.table-stms thead {
+  background: var(--canvas);
+}
+
+.table-stms th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--slate);
+  font-weight: 700;
+  border-bottom: none;
+}
+
+.avatar-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--indigo-100);
+  color: var(--indigo-600);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
