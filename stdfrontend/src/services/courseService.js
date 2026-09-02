@@ -1,10 +1,11 @@
 import api, { mockDelay } from './api'
 import { mockCourses as seedCourses } from '../mock/mockData'
 
-const USE_MOCK = true
+const USE_MOCK = false
 const STORAGE_KEY = 'stms_mockCourses_v1'
 
 // ---- Persistent mock course store (backed by localStorage) ----
+// Only used as a local dev fallback when USE_MOCK is true.
 const loadCourses = () => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -24,20 +25,33 @@ const saveCourses = (list) => {
   }
 }
 
-let mockCourses = loadCourses()
+let mockCourses = USE_MOCK ? loadCourses() : []
 // ------------------------------------------------------------------
+
+// Backend wraps responses as { success, message, data, meta } via sendSuccess()
+const extractArray = (payload) => {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.data)) return payload.data
+  console.warn('Unexpected courses response shape:', payload)
+  return []
+}
+
+const extractData = (payload) => {
+  if (payload?.data !== undefined) return payload.data
+  return payload
+}
 
 const courseService = {
   async getAllCourses() {
     if (USE_MOCK) return mockDelay([...mockCourses])
     const { data } = await api.get('/courses')
-    return data
+    return extractArray(data)
   },
 
   async getCourseById(id) {
     if (USE_MOCK) return mockDelay(mockCourses.find((c) => c.id === id) || null)
     const { data } = await api.get(`/courses/${id}`)
-    return data
+    return extractData(data)
   },
 
   async createCourse(payload) {
@@ -52,7 +66,7 @@ const courseService = {
       return mockDelay(newCourse, 700)
     }
     const { data } = await api.post('/courses', payload)
-    return data
+    return extractData(data)
   },
 
   async updateCourse(id, payload) {
@@ -62,7 +76,7 @@ const courseService = {
       return mockDelay(mockCourses.find((c) => c.id === id), 600)
     }
     const { data } = await api.put(`/courses/${id}`, payload)
-    return data
+    return extractData(data)
   },
 
   async deleteCourse(id) {
@@ -72,7 +86,7 @@ const courseService = {
       return mockDelay({ success: true, id }, 500)
     }
     const { data } = await api.delete(`/courses/${id}`)
-    return data
+    return extractData(data)
   },
 }
 
