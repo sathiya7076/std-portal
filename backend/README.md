@@ -1,3 +1,5 @@
+chang course cont
+
 # Smart Training Management System — Backend
 
 A production-style REST API backend for a training/LMS platform with two roles:
@@ -8,7 +10,6 @@ This is a **backend-only** project. It is designed to be consumed by a separate
 React.js + Bootstrap frontend over REST APIs.
 
 ---
-
 ## Tech Stack
 
 - Node.js + Express.js — REST API server
@@ -278,3 +279,5 @@ After running `Password@123``:
 - Uploaded files are served statically at `/uploads/materials/...` and
   `/uploads/submissions/...`
 - All list endpoints support `?page=&limit=` query params
+
+new add
