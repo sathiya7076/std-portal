@@ -8,7 +8,7 @@ import ProgressBar from '../../components/ProgressBar'
 import studentService from '../../services/studentService'
 
 export default function TrainerStudentDetail() {
-  const { id } = useParams()
+  const { id } = useParams() // this is now the real Mongo _id (see TrainerStudents.jsx)
   const [state, setState] = useState({ loading: true, error: null, student: null })
 
   const load = async () => {
@@ -39,7 +39,8 @@ export default function TrainerStudentDetail() {
       <div className="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4">
         <div>
           <h4 className="font-display fw-bold mb-1">{s.name}</h4>
-          <p className="text-muted mb-0">{s.id} • {s.course}</p>
+          {/* FIXED: display studentId, not _id */}
+          <p className="text-muted mb-0">{s.studentId} • {s.course}</p>
         </div>
         <div className="d-flex gap-2">
           <button className="btn btn-outline-secondary btn-sm"><i className="bi bi-pencil me-1"></i>Edit</button>
@@ -54,7 +55,8 @@ export default function TrainerStudentDetail() {
             <table className="table table-borderless mb-0">
               <tbody>
                 <tr><td className="text-muted">Student Name</td><td className="fw-semibold">{s.name}</td></tr>
-                <tr><td className="text-muted">Student ID</td><td className="fw-semibold">{s.id}</td></tr>
+                {/* FIXED: display studentId, not _id */}
+                <tr><td className="text-muted">Student ID</td><td className="fw-semibold">{s.studentId}</td></tr>
                 <tr><td className="text-muted">Course</td><td className="fw-semibold">{s.course}</td></tr>
                 <tr><td className="text-muted">Email</td><td className="fw-semibold">{s.email}</td></tr>
                 <tr><td className="text-muted">Phone</td><td className="fw-semibold">{s.phone}</td></tr>

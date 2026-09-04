@@ -8,7 +8,6 @@ const initialFormState = {
   roadmap: "",
   duration: "",
   fees: "",
-  trainerId: "",
   status: "active",
 };
 
@@ -25,7 +24,10 @@ const TrainerCourses = () => {
 
   const fetchCourses = async () => {
     try {
-      const data = await courseService.getCourses();
+      // FIXED: courseService.getCourses() does not exist — the service
+      // only exports getAllCourses(). This was throwing every time and
+      // being silently swallowed below, so the list never loaded.
+      const data = await courseService.getAllCourses();
       setCourses(data);
     } catch (err) {
       console.error("Failed to fetch courses:", err.response?.data || err.message);
@@ -61,10 +63,6 @@ const TrainerCourses = () => {
       payload.append("fees", formData.fees);
       payload.append("status", formData.status);
 
-      if (formData.trainerId.trim() !== "") {
-        payload.append("trainerId", formData.trainerId.trim());
-      }
-
       formData.technologies
         .split(",")
         .map((t) => t.trim())
@@ -80,6 +78,11 @@ const TrainerCourses = () => {
       setFormData(initialFormState);
       setImageFile(null);
       e.target.reset();
+
+      // Re-fetch from the server so the list reflects the real saved
+      // record (including the trainer populate) rather than trusting
+      // the raw create response's shape.
+      await fetchCourses();
     } catch (err) {
       const serverErrors = err.response?.data?.errors;
       setErrors(serverErrors && serverErrors.length ? serverErrors : [err.message]);
@@ -122,9 +125,6 @@ const TrainerCourses = () => {
           <input type="number" name="fees" value={formData.fees} onChange={handleChange} placeholder="Fees" min="0" required />
         </div>
         <div>
-          <input name="trainerId" value={formData.trainerId} onChange={handleChange} placeholder="Trainer ID (optional)" />
-        </div>
-        <div>
           <select name="status" value={formData.status} onChange={handleChange}>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
@@ -151,21 +151,33 @@ const TrainerCourses = () => {
           </tr>
         </thead>
         <tbody>
-          {courses.map((course) => (
-            <tr key={course._id}>
-              <td>{course.name}</td>
-              <td>{course.duration}</td>
-              <td>{course.fees}</td>
-              <td>{course.status}</td>
-              <td>
-                {course.image ? (
-                  <img src={`http://localhost:5000${course.image}`} alt={course.name} width="60" />
-                ) : (
-                  "—"
-                )}
+          {courses.length === 0 ? (
+            <tr>
+              <td colSpan="5" style={{ textAlign: "center" }}>
+                No courses yet.
               </td>
             </tr>
-          ))}
+          ) : (
+            courses.map((course) => (
+              <tr key={course._id || course.id}>
+                <td>{course.name}</td>
+                <td>{course.duration}</td>
+                <td>{course.fees}</td>
+                <td>{course.status}</td>
+                <td>
+                  {course.image ? (
+                    <img
+                      src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}${course.image}`}
+                      alt={course.name}
+                      width="60"
+                    />
+                  ) : (
+                    "—"
+                  )}
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </div>

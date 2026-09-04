@@ -58,8 +58,20 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('stms_token')
   }
 
+  // NEW: merges updated fields into the current user, in both state and
+  // localStorage, without touching the auth token. TrainerProfile.jsx
+  // (and any other profile-edit screen) calls this after a successful
+  // update API call so the UI reflects the change immediately.
+  const updateUser = (updatedFields) => {
+    setUser((prev) => {
+      const merged = { ...prev, ...updatedFields }
+      localStorage.setItem('stms_user', JSON.stringify(merged))
+      return merged
+    })
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   )

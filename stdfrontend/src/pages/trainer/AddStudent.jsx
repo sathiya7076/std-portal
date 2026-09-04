@@ -43,7 +43,6 @@ export default function AddStudent() {
     else if (!/^\S+@\S+\.\S+$/.test(form.email)) next.email = 'Enter a valid email address.'
     if (!form.phone.trim()) next.phone = 'Phone number is required.'
     if (!form.course) next.course = 'Please select a course.'
-    if (!form.id.trim()) next.id = 'Student ID is required.'
     if (!form.password || form.password.length < 6) next.password = 'Password must be at least 6 characters.'
     if (!form.joiningDate) next.joiningDate = 'Joining date is required.'
     setErrors(next)
@@ -59,10 +58,11 @@ export default function AddStudent() {
 
     setSubmitting(true)
     try {
-      // Create the login account. Student logs in with EMAIL + password,
-      // same as trainers. The "Student ID" field below is a profile/admin
-      // identifier only — it is NOT used for login.
-      const { user: newStudentUser } = await authService.register({
+      // Step 1: register the account. CONFIRMED (authController.js):
+      // this ALSO auto-creates the linked Student profile — the backend
+      // generates its own studentId (e.g. "STU-LX7K9F"); it does not
+      // accept a custom one at this step.
+      const { profile } = await authService.register({
         name: form.name,
         email: form.email,
         password: form.password,
@@ -70,10 +70,36 @@ export default function AddStudent() {
         phone: form.phone,
       })
 
-      // Create the student profile record, linked to that account
-      await studentService.createStudent({
-        ...form,
-        userId: newStudentUser.id ?? newStudentUser._id,
+      if (!profile?._id) {
+        throw new Error('Registration succeeded, but no profile ID was returned to complete setup.')
+      }
+
+      // Step 2: fill in the fields register didn't collect, using the
+      // Student document's real Mongo _id (profile._id) — CONFIRMED
+      // correct target for PUT /students/:id.
+      //
+      // ⚠️ KNOWN UNRESOLVED GAP — course mapping:
+      // The backend's Student model expects `courseId` to be a real
+      // Course document's Mongo ID (see Student.create in
+      // authController.js). The dropdown below is currently populated
+      // from `mockCourses` (local mock data), so `form.course` is a
+      // course NAME string, not a real backend Course _id. Sending it
+      // as courseId will likely fail silently or store an invalid
+      // reference. This needs a real courses list from the backend
+      // (e.g. GET /courses) with actual _id values used as the <option>
+      // value, replacing mockCourses. Flagging rather than guessing —
+      // share courseController.js or the Course model if you'd like
+      // this wired up correctly.
+      //
+      // ⚠️ ALSO UNCONFIRMED: joiningDate does not appear in
+      // Student.create() in authController.js, so it may not exist on
+      // the Student schema. Sending it is harmless if the backend
+      // ignores unknown fields, but it won't persist unless the schema
+      // supports it — share models/Student.js to confirm.
+      await studentService.updateStudent(profile._id, {
+        courseId: form.course, // NOT YET CORRECT — see note above
+        joiningDate: form.joiningDate, // UNCONFIRMED FIELD — see note above
+        phone: form.phone,
       })
 
       setSubmitting(false)
@@ -85,7 +111,17 @@ export default function AddStudent() {
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {
       setSubmitting(false)
-      setServerError(err?.response?.data?.message || 'Failed to add student. Please try again.')
+      const backendMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        (typeof err?.response?.data === 'string' ? err.response.data : null) ||
+        err?.message
+
+      if (err?.response?.status === 409) {
+        setServerError(backendMsg || 'A user with this email already exists.')
+      } else {
+        setServerError(backendMsg || 'Failed to add student. Please try again.')
+      }
     }
   }
 
@@ -123,6 +159,7 @@ export default function AddStudent() {
             </div>
             <div className="col-md-6 mb-3">
               <label className="form-label small fw-semibold">Course</label>
+              {/* ⚠️ Still using mockCourses (names, not real backend IDs) — see note in handleSubmit above */}
               <select className={`form-select ${errors.course ? 'is-invalid' : ''}`} value={form.course} onChange={handleChange('course')}>
                 <option value="">Select a course</option>
                 {mockCourses.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
@@ -130,19 +167,14 @@ export default function AddStudent() {
               {errors.course && <div className="invalid-feedback">{errors.course}</div>}
             </div>
             <div className="col-md-6 mb-3">
-              <label className="form-label small fw-semibold">Student ID (profile reference only, not for login)</label>
-              <input className={`form-control ${errors.id ? 'is-invalid' : ''}`} placeholder="e.g. STU008" value={form.id} onChange={handleChange('id')} />
-              {errors.id && <div className="invalid-feedback">{errors.id}</div>}
+              <label className="form-label small fw-semibold">Joining Date</label>
+              <input type="date" className={`form-control ${errors.joiningDate ? 'is-invalid' : ''}`} value={form.joiningDate} onChange={handleChange('joiningDate')} />
+              {errors.joiningDate && <div className="invalid-feedback">{errors.joiningDate}</div>}
             </div>
             <div className="col-md-6 mb-3">
               <label className="form-label small fw-semibold">Password</label>
               <input type="password" className={`form-control ${errors.password ? 'is-invalid' : ''}`} value={form.password} onChange={handleChange('password')} />
               {errors.password && <div className="invalid-feedback">{errors.password}</div>}
-            </div>
-            <div className="col-md-6 mb-3">
-              <label className="form-label small fw-semibold">Joining Date</label>
-              <input type="date" className={`form-control ${errors.joiningDate ? 'is-invalid' : ''}`} value={form.joiningDate} onChange={handleChange('joiningDate')} />
-              {errors.joiningDate && <div className="invalid-feedback">{errors.joiningDate}</div>}
             </div>
           </div>
           <button className="btn btn-primary-stms" disabled={submitting}>
@@ -175,8 +207,8 @@ export default function AddStudent() {
               </thead>
               <tbody>
                 {students.map((s) => (
-                  <tr key={s.id || s._id}>
-                    <td>{s.id}</td>
+                  <tr key={s._id}>
+                    <td>{s.studentId}</td>
                     <td>{s.name}</td>
                     <td>{s.email}</td>
                     <td>{s.phone}</td>

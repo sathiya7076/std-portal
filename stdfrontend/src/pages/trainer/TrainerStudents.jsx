@@ -33,8 +33,10 @@ export default function TrainerStudents() {
   useEffect(() => { setPage(1) }, [search, course, sortBy])
 
   const handleDelete = async () => {
-    await studentService.deleteStudent(toDelete.id)
-    setState((s) => ({ ...s, students: s.students.filter((st) => st.id !== toDelete.id) }))
+    // FIXED: use _id (real Mongo ID), not studentId (display code) —
+    // DELETE /students/:id needs the real document ID.
+    await studentService.deleteStudent(toDelete._id)
+    setState((s) => ({ ...s, students: s.students.filter((st) => st._id !== toDelete._id) }))
     setToDelete(null)
   }
 
@@ -94,8 +96,9 @@ export default function TrainerStudents() {
               </thead>
               <tbody>
                 {paginated.map((s) => (
-                  <tr key={s.id}>
-                    <td className="text-muted">{s.id}</td>
+                  <tr key={s._id}>
+                    {/* FIXED: display studentId (human-readable, e.g. "STU-LX7K9F"), not _id */}
+                    <td className="text-muted">{s.studentId}</td>
                     <td className="fw-semibold">{s.name}</td>
                     <td>{s.course}</td>
                     <td>{s.attendance}%</td>
@@ -104,7 +107,8 @@ export default function TrainerStudents() {
                     </td>
                     <td>
                       <div className="d-flex gap-1">
-                        <button className="btn btn-sm btn-outline-secondary" onClick={() => navigate(`/trainer/students/${s.id}`)}>
+                        {/* FIXED: navigate using _id (real Mongo ID) — GET /students/:id needs this, not the display code */}
+                        <button className="btn btn-sm btn-outline-secondary" onClick={() => navigate(`/trainer/students/${s._id}`)}>
                           <i className="bi bi-eye"></i>
                         </button>
                         <button className="btn btn-sm btn-outline-danger" onClick={() => setToDelete(s)}>

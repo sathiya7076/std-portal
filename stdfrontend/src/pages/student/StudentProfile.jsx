@@ -14,13 +14,20 @@ export default function StudentProfile() {
   const load = async () => {
     setState({ loading: true, error: null, profile: null, progress: [] })
     try {
-      const [profile, progress] = await Promise.all([
-        studentService.getProfile(),
-        studentService.getLearningProgress(),
-      ])
+      const profile = await studentService.getProfile()
+      // FIXED: getLearningProgress() hits an unconfirmed backend route —
+      // isolated into its own try/catch so a missing/broken progress
+      // endpoint doesn't block the whole profile from loading.
+      let progress = []
+      try {
+        progress = await studentService.getLearningProgress()
+      } catch (err) {
+        console.warn('Learning progress unavailable:', err?.response?.data || err.message)
+      }
       setState({ loading: false, error: null, profile, progress })
       setForm(profile)
-    } catch {
+    } catch (err) {
+      console.error('Failed to load profile:', err?.response?.data || err.message)
       setState({ loading: false, error: 'Unable to load your profile.', profile: null, progress: [] })
     }
   }
@@ -30,10 +37,22 @@ export default function StudentProfile() {
   const handleSave = async (e) => {
     e.preventDefault()
     setSaving(true)
-    const updated = await studentService.updateProfile(form)
-    setState((s) => ({ ...s, profile: updated }))
-    setSaving(false)
-    setEditing(false)
+    try {
+      // FIXED: backend updateMyProfile only accepts phone + address —
+      // sending the whole form (including course, name, email which the
+      // backend ignores/can't change) is harmless but only these two
+      // actually persist.
+      const updated = await studentService.updateProfile({
+        phone: form.phone,
+        address: form.address,
+      })
+      setState((s) => ({ ...s, profile: { ...s.profile, ...updated } }))
+    } catch (err) {
+      console.error('Failed to update profile:', err?.response?.data || err.message)
+    } finally {
+      setSaving(false)
+      setEditing(false)
+    }
   }
 
   const breadcrumb = ['Student', 'Student Profile']
@@ -59,8 +78,17 @@ export default function StudentProfile() {
               <table className="table table-borderless mb-0">
                 <tbody>
                   <tr><td className="text-muted">Name</td><td className="fw-semibold">{p.name}</td></tr>
-                  <tr><td className="text-muted">Student ID</td><td className="fw-semibold">{p.id}</td></tr>
-                  <tr><td className="text-muted">Course</td><td className="fw-semibold">{p.course}</td></tr>
+                  {/* FIXED: was p.id — backend field is studentId */}
+                  <tr><td className="text-muted">Student ID</td><td className="fw-semibold">{p.studentId}</td></tr>
+                  {/* FIXED: p.course is now an object ({name, duration, fees, trainerId}), not a string */}
+                  <tr><td className="text-muted">Course</td><td className="fw-semibold">{p.course?.name || '—'}</td></tr>
+                  {/* NEW: assigned trainer, now available via the nested populate fix */}
+                  <tr>
+                    <td className="text-muted">Trainer</td>
+                    <td className="fw-semibold">
+                      {p.course?.trainerId?.userId?.name || 'Not assigned'}
+                    </td>
+                  </tr>
                   <tr><td className="text-muted">Email</td><td className="fw-semibold">{p.email}</td></tr>
                   <tr><td className="text-muted">Phone</td><td className="fw-semibold">{p.phone}</td></tr>
                   <tr><td className="text-muted">Address</td><td className="fw-semibold">{p.address}</td></tr>
@@ -68,7 +96,7 @@ export default function StudentProfile() {
               </table>
             ) : (
               <form onSubmit={handleSave}>
-                {['email', 'phone', 'address'].map((field) => (
+                {['phone', 'address'].map((field) => (
                   <div className="mb-3" key={field}>
                     <label className="form-label small fw-semibold text-capitalize">{field}</label>
                     <input
@@ -89,9 +117,13 @@ export default function StudentProfile() {
         <div className="col-lg-6 mb-4">
           <div className="surface-card p-4">
             <h6 className="fw-semibold mb-3">Learning Progress</h6>
-            {state.progress.map((s) => (
-              <ProgressBar key={s.skill} label={s.skill} percent={s.percent} />
-            ))}
+            {state.progress.length === 0 ? (
+              <p className="text-muted small">No progress data available yet.</p>
+            ) : (
+              state.progress.map((s) => (
+                <ProgressBar key={s.skill} label={s.skill} percent={s.percent} />
+              ))
+            )}
           </div>
         </div>
       </div>

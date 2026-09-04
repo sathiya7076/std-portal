@@ -6,10 +6,9 @@ import {
   mockStudents as seedStudents,
 } from '../mock/mockData'
 
-const USE_MOCK = true
+const USE_MOCK = false
 const STORAGE_KEY = 'stms_mockStudents_v1'
 
-// ---- Persistent mock student store (backed by localStorage) ----
 const loadStudents = () => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -17,7 +16,6 @@ const loadStudents = () => {
   } catch (err) {
     console.warn('Failed to parse stored students, falling back to seed data.', err)
   }
-  // First run (or corrupted storage): seed from mockData and persist it
   localStorage.setItem(STORAGE_KEY, JSON.stringify(seedStudents))
   return [...seedStudents]
 }
@@ -30,38 +28,94 @@ const saveStudents = (list) => {
   }
 }
 
-let mockStudents = loadStudents()
-// ------------------------------------------------------------------
+let mockStudents = USE_MOCK ? loadStudents() : []
+
+const extractData = (payload) => (payload?.data !== undefined ? payload.data : payload)
+
+const extractArray = (payload) => {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.data)) return payload.data
+  if (Array.isArray(payload?.students)) return payload.students
+  if (Array.isArray(payload?.data?.students)) return payload.data.students
+  console.warn('Unexpected students response shape:', payload)
+  return []
+}
+
+// UPDATED based on confirmed backend shape (authController.js's register
+// function, and getMe's use of .populate("courseId", "name duration fees")):
+//
+// - _id: the REAL Mongo ID. Use this for every API call (getStudentById,
+//   updateStudent, deleteStudent, navigation). NEVER use studentId for
+//   these — it's not a valid ObjectId and will break findById-style
+//   backend lookups.
+// - studentId: the backend-auto-generated human-readable code
+//   (e.g. "STU-LX7K9F"). DISPLAY ONLY.
+// - course: if the backend populates courseId (as getMe does), it comes
+//   back as an object like { _id, name, duration, fees } — this reads
+//   raw.courseId?.name in that case. If GET /students does NOT populate
+//   it, course will show blank until that's confirmed.
+const normalizeStudent = (raw) => {
+  if (!raw || typeof raw !== 'object') return raw
+  return {
+    ...raw,
+    _id: raw._id ?? raw.id,
+    studentId: raw.studentId ?? raw.id ?? raw._id,
+    name: raw.name ?? raw.fullName ?? raw.studentName ?? raw.full_name,
+    course:
+      (typeof raw.courseId === 'object' ? raw.courseId?.name : raw.course) ??
+      raw.courseName ??
+      raw.course_name,
+    attendance: raw.attendance ?? raw.attendancePercentage ?? raw.attendancePercent ?? 0,
+    progress: raw.progress ?? raw.learningProgress ?? raw.progressPercentage ?? 0,
+    email: raw.email ?? raw.userEmail,
+    phone: raw.phone ?? raw.phoneNumber ?? raw.mobile,
+    joiningDate: raw.joiningDate ?? raw.joinDate ?? raw.createdAt,
+  }
+}
 
 const studentService = {
   async getProfile() {
     if (USE_MOCK) return mockDelay({ ...mockUsers.student })
-    const { data } = await api.get('/students/me')
-    return data
+    const { data } = await api.get('/student/profile')
+    return normalizeStudent(extractData(data))
   },
 
   async updateProfile(payload) {
+    // Student's own self-service update — acts on whichever account's
+    // token is active. Never call this from trainer screens.
     if (USE_MOCK) return mockDelay({ ...mockUsers.student, ...payload })
-    const { data } = await api.put('/students/me', payload)
-    return data
+    const { data } = await api.put('/student/profile', payload)
+    return normalizeStudent(extractData(data))
+  },
+
+  // CONFIRMED route: PUT /students/:id (trainer-only, per studentRoutes.js).
+  // id MUST be the Student document's Mongo _id (see normalizeStudent).
+  async updateStudent(mongoId, payload) {
+    if (USE_MOCK) {
+      mockStudents = mockStudents.map((s) => (s._id === mongoId ? { ...s, ...payload } : s))
+      saveStudents(mockStudents)
+      return mockDelay({ ...payload, _id: mongoId })
+    }
+    const { data } = await api.put(`/students/${mongoId}`, payload)
+    return normalizeStudent(extractData(data))
   },
 
   async getAttendance() {
     if (USE_MOCK) return mockDelay({ ...mockAttendance })
     const { data } = await api.get('/students/me/attendance')
-    return data
+    return extractData(data)
   },
 
   async getLearningProgress() {
     if (USE_MOCK) return mockDelay([...mockLearningProgress])
     const { data } = await api.get('/students/me/progress')
-    return data
+    return extractData(data)
   },
 
   async registerFingerprint() {
     if (USE_MOCK) return mockDelay({ success: true }, 1800)
     const { data } = await api.post('/students/me/fingerprint')
-    return data
+    return extractData(data)
   },
 
   async getAllStudents({ search = '', course = '', sortBy = 'name' } = {}) {
@@ -70,9 +124,7 @@ const studentService = {
       if (search) {
         const q = search.toLowerCase()
         list = list.filter(
-          (s) =>
-            s.name.toLowerCase().includes(q) ||
-            (s.id || '').toLowerCase().includes(q)
+          (s) => s.name.toLowerCase().includes(q) || (s.studentId || '').toLowerCase().includes(q)
         )
       }
       if (course) list = list.filter((s) => s.course === course)
@@ -80,40 +132,48 @@ const studentService = {
       return mockDelay(list)
     }
     const { data } = await api.get('/students', { params: { search, course, sortBy } })
-    return data
+    const rawList = extractArray(data)
+
+    if (rawList.length > 0) {
+      console.log('[DEBUG] Raw student object from backend:', rawList[0])
+    }
+
+    return rawList.map(normalizeStudent)
   },
 
-  async getStudentById(id) {
+  // id here is the Mongo _id (see normalizeStudent / TrainerStudents.jsx).
+  async getStudentById(mongoId) {
     if (USE_MOCK) {
-      const student = mockStudents.find((s) => s.id === id)
+      const student = mockStudents.find((s) => s._id === mongoId)
       return mockDelay(student ? { ...student, ...mockAttendance } : null)
     }
-    const { data } = await api.get(`/students/${id}`)
-    return data
+    const { data } = await api.get(`/students/${mongoId}`)
+    return normalizeStudent(extractData(data))
   },
 
+  // NOTE: with the register-auto-creates-profile flow now confirmed,
+  // this create call is no longer used by AddStudent.jsx (it would
+  // 409 — the profile already exists). Left in place in case you have
+  // another flow that needs a direct create without registration.
   async createStudent(payload) {
     if (USE_MOCK) {
-      const newStudent = {
-        ...payload,
-        id: payload.id || `STU${Math.floor(Math.random() * 900 + 100)}`,
-      }
+      const newStudent = { ...payload, studentId: payload.studentId || `STU-${Math.floor(Math.random() * 900 + 100)}` }
       mockStudents.push(newStudent)
-      saveStudents(mockStudents) // 👈 persist immediately
+      saveStudents(mockStudents)
       return mockDelay(newStudent, 700)
     }
     const { data } = await api.post('/students', payload)
-    return data
+    return normalizeStudent(extractData(data))
   },
 
-  async deleteStudent(id) {
+  async deleteStudent(mongoId) {
     if (USE_MOCK) {
-      mockStudents = mockStudents.filter((s) => s.id !== id)
-      saveStudents(mockStudents) // 👈 persist immediately
-      return mockDelay({ success: true, id }, 500)
+      mockStudents = mockStudents.filter((s) => s._id !== mongoId)
+      saveStudents(mockStudents)
+      return mockDelay({ success: true, id: mongoId })
     }
-    const { data } = await api.delete(`/students/${id}`)
-    return data
+    const { data } = await api.delete(`/students/${mongoId}`)
+    return extractData(data)
   },
 }
 

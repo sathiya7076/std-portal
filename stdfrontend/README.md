@@ -96,3 +96,4 @@ src/
   student tries to open a trainer route (or vice versa).
 - All forms include client-side validation, loading states, and empty/error
   states per screen.
+  trainer dashboard ok
