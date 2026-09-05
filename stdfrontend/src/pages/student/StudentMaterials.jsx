@@ -30,18 +30,21 @@ export default function StudentMaterials() {
       {state.error && <ErrorMessage message={state.error} onRetry={load} />}
       {!state.loading && !state.error && (
         <div className="row">
-          {state.courses.map((c) => (
-            <div className="col-md-6 col-xl-3 mb-4" key={c.id}>
-              <div
-                className="surface-card p-4 h-100 cursor-pointer"
-                onClick={() => navigate(`/student/materials/${c.id}`)}
-              >
-                <span className="stat-icon bg-indigo-soft mb-3"><i className={`bi ${c.icon}`}></i></span>
-                <h6 className="fw-semibold">{c.name}</h6>
-                <span className="text-indigo small">Browse Materials <i className="bi bi-arrow-right"></i></span>
+          {state.courses.map((c) => {
+            const courseId = c._id ?? c.id
+            return (
+              <div className="col-md-6 col-xl-3 mb-4" key={courseId}>
+                <div
+                  className="surface-card p-4 h-100 cursor-pointer"
+                  onClick={() => navigate(`/student/materials/${courseId}`)}
+                >
+                  <span className="stat-icon bg-indigo-soft mb-3"><i className={`bi ${c.icon}`}></i></span>
+                  <h6 className="fw-semibold">{c.name}</h6>
+                  <span className="text-indigo small">Browse Materials <i className="bi bi-arrow-right"></i></span>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </Layout>

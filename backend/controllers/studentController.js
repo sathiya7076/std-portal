@@ -182,6 +182,23 @@ const getMyProfile = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Get own learning progress + attendance summary
+// @route   GET /api/student/progress
+// @access  Private (student only)
+const getMyProgress = asyncHandler(async (req, res) => {
+  const student = await Student.findOne({ userId: req.user._id });
+  if (!student) {
+    throw new ApiError(404, "Student profile not found");
+  }
+
+  const attendanceSummary = await getStudentAttendanceSummary(student._id);
+
+  return sendSuccess(res, 200, "Student progress fetched successfully", {
+    learningProgress: student.learningProgress,
+    attendance: attendanceSummary,
+  });
+});
+
 // @desc    Update own student profile
 // @route   PUT /api/student/profile
 // @access  Private (student only)
@@ -210,6 +227,7 @@ module.exports = {
   getStudentProgress,
   getOwnStudentProfile,
   getMyProfile,
+  getMyProgress,
   updateMyProfile,
   generateShortId,
 };

@@ -120,6 +120,15 @@ const studentService = {
     return extractData(data)
   },
 
+  // Student self-service attendance check-in, called by
+  // StudentRegister.jsx's handleMarkAttendance(). CONFIRMED route per
+  // attendanceRoutes.js: POST /attendance/checkin (requireRole("student")).
+  async markMyAttendance() {
+    if (USE_MOCK) return mockDelay({ success: true, timestamp: new Date().toISOString() }, 800)
+    const { data } = await api.post('/attendance/checkin')
+    return extractData(data)
+  },
+
   async getLearningProgress() {
     if (USE_MOCK) return mockDelay([...mockLearningProgress])
     const { data } = await api.get('/students/me/progress')

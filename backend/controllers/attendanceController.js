@@ -74,6 +74,43 @@ const markAttendance = asyncHandler(async (req, res) => {
   return sendSuccess(res, 201, "Attendance marked successfully", attendance);
 });
 
+// @desc    Student self check-in for today's attendance
+// @route   POST /api/attendance/checkin
+// @access  Private (student only)
+const markMyAttendance = asyncHandler(async (req, res) => {
+  const student = await Student.findOne({ userId: req.user._id });
+  if (!student) {
+    throw new ApiError(404, "Student profile not found");
+  }
+
+  const now = new Date();
+
+  let attendance;
+  try {
+    attendance = await Attendance.create({
+      studentId: student._id,
+      date: now,
+      status: "present",
+      checkInTime: now,
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      throw new ApiError(409, "Attendance already recorded for today");
+    }
+    throw error;
+  }
+
+  await createNotification({
+    userId: req.user._id,
+    type: "attendance",
+    title: "Attendance Marked Present",
+    message: `Your attendance was marked present on ${now.toDateString()}.`,
+    relatedId: attendance._id,
+  });
+
+  return sendSuccess(res, 201, "Attendance marked successfully", attendance);
+});
+
 // @desc    Get attendance records (filterable by student/date range)
 // @route   GET /api/attendance
 // @access  Private (trainer sees all, student sees own only)
@@ -136,4 +173,29 @@ const getAttendanceSummary = asyncHandler(async (req, res) => {
   );
 });
 
-module.exports = { markAttendance, getAttendanceRecords, getAttendanceSummary };
+// @desc    Get own attendance summary — no :studentId param needed
+// @route   GET /api/attendance/me
+// @access  Private (student only)
+const getMyAttendanceSummary = asyncHandler(async (req, res) => {
+  const student = await Student.findOne({ userId: req.user._id });
+  if (!student) {
+    throw new ApiError(404, "Student profile not found");
+  }
+
+  const summary = await getStudentAttendanceSummary(student._id);
+
+  return sendSuccess(
+    res,
+    200,
+    "Attendance summary fetched successfully",
+    summary
+  );
+});
+
+module.exports = {
+  markAttendance,
+  markMyAttendance,
+  getAttendanceRecords,
+  getAttendanceSummary,
+  getMyAttendanceSummary,
+};
