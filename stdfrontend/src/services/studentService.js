@@ -54,20 +54,34 @@ const extractArray = (payload) => {
 //   back as an object like { _id, name, duration, fees } — this reads
 //   raw.courseId?.name in that case. If GET /students does NOT populate
 //   it, course will show blank until that's confirmed.
+//
+// CONFIRMED via models/Student.js: the Student document itself has NO
+// `name` or `email` field — only userId (ref User), studentId, courseId,
+// phone, address, joiningDate, learningProgress. Name/email live on the
+// linked User document. So GET /students must `.populate('userId', 'name
+// email')` (the same pattern getMe() already uses for courseId) for
+// these to ever show up here. This normalizer now reads them off a
+// populated raw.userId object if present — but if the backend sends
+// userId as a plain ObjectId string (not populated), there is nothing
+// on the client to recover: check the [DEBUG] console log below (or the
+// network tab) to see whether raw.userId is a string or an object, and
+// if it's a string, the fix belongs in the GET /students controller,
+// not here.
 const normalizeStudent = (raw) => {
   if (!raw || typeof raw !== 'object') return raw
+  const user = typeof raw.userId === 'object' ? raw.userId : null
   return {
     ...raw,
     _id: raw._id ?? raw.id,
     studentId: raw.studentId ?? raw.id ?? raw._id,
-    name: raw.name ?? raw.fullName ?? raw.studentName ?? raw.full_name,
+    name: raw.name ?? raw.fullName ?? raw.studentName ?? raw.full_name ?? user?.name,
     course:
       (typeof raw.courseId === 'object' ? raw.courseId?.name : raw.course) ??
       raw.courseName ??
       raw.course_name,
     attendance: raw.attendance ?? raw.attendancePercentage ?? raw.attendancePercent ?? 0,
     progress: raw.progress ?? raw.learningProgress ?? raw.progressPercentage ?? 0,
-    email: raw.email ?? raw.userEmail,
+    email: raw.email ?? raw.userEmail ?? user?.email,
     phone: raw.phone ?? raw.phoneNumber ?? raw.mobile,
     joiningDate: raw.joiningDate ?? raw.joinDate ?? raw.createdAt,
   }
@@ -135,7 +149,11 @@ const studentService = {
     const rawList = extractArray(data)
 
     if (rawList.length > 0) {
+      // FIX: this debug line already existed — keep using it to check
+      // whether raw.userId comes back as a string (needs backend
+      // populate) or an object with name/email (frontend fix applies).
       console.log('[DEBUG] Raw student object from backend:', rawList[0])
+      console.log('[DEBUG] raw.userId shape:', rawList[0]?.userId)
     }
 
     return rawList.map(normalizeStudent)

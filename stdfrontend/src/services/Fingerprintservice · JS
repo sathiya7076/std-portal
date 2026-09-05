@@ -1,0 +1,19 @@
+import api from './api'
+
+const fingerprintService = {
+  // Student registers their own fingerprint — no body needed,
+  // backend resolves the student from the authenticated user.
+  registerOwn: () =>
+    api.post('/fingerprint/register').then((res) => res.data.data),
+
+  // Trainer registers a fingerprint on behalf of a student, identified by
+  // her login ID (email or student code like STU-XXXXX).
+  registerForStudent: (loginId) =>
+    api.post('/fingerprint/register', { loginId }).then((res) => res.data.data),
+
+  // Trainer or the student herself checking fingerprint + attendance status.
+  getStatus: (studentId) =>
+    api.get(`/fingerprint/student/${studentId}`).then((res) => res.data.data),
+}
+
+export default fingerprintService

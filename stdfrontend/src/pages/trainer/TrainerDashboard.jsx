@@ -1,84 +1,110 @@
 import React, { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import Loading from '../../components/Loading'
 import ErrorMessage from '../../components/ErrorMessage'
+import EmptyState from '../../components/EmptyState'
 import ProgressBar from '../../components/ProgressBar'
-import { useAuth } from '../../context/AuthContext'
 import studentService from '../../services/studentService'
-import courseService from '../../services/courseService'
-import taskService from '../../services/taskService'
-import materialService from '../../services/materialService'
+
+// Trainer Dashboard — lists every registered student with their
+// attendance % and learning progress %, so a trainer can scan the
+// whole cohort at a glance instead of opening each profile.
+//
+// Uses studentService.getAllStudents(), which already returns
+// normalized student objects (see normalizeStudent in
+// studentService.js): s._id is the Mongo id (used for links),
+// s.studentId is the human-readable code (display only).
 
 export default function TrainerDashboard() {
-  const { user } = useAuth()
-  const [state, setState] = useState({ loading: true, error: null, data: null })
+  const [state, setState] = useState({ loading: true, error: null, students: [] })
+  const [search, setSearch] = useState('')
+  const [course, setCourse] = useState('')
 
   const load = async () => {
-    setState({ loading: true, error: null, data: null })
+    setState((prev) => ({ ...prev, loading: true, error: null }))
     try {
-      const [students, courses, tasks, materials] = await Promise.all([
-        studentService.getAllStudents(),
-        courseService.getAllCourses(),
-        taskService.getStudentTasks(),
-        materialService.getAllMaterials(),
-      ])
-      setState({
-        loading: false,
-        error: null,
-        data: {
-          totalStudents: students.length,
-          totalCourses: courses.length,
-          todaysAttendance: 92,
-          pendingTasks: tasks.filter((t) => t.status === 'Pending').length,
-          submittedTasks: tasks.filter((t) => t.status === 'Submitted').length,
-          totalMaterials: materials.length,
-          students,
-        },
-      })
+      const students = await studentService.getAllStudents({ search, course })
+      setState({ loading: false, error: null, students })
     } catch {
-      setState({ loading: false, error: 'Could not load the dashboard.', data: null })
+      setState({ loading: false, error: 'Unable to load students.', students: [] })
     }
   }
 
-  useEffect(() => { load() }, [])
+  // Reload whenever the trainer changes filters. If you'd rather
+  // filter client-side only, drop `search`/`course` from the deps
+  // and instead filter `state.students` below.
+  useEffect(() => { load() }, [search, course])
 
-  const breadcrumb = ['Trainer', 'Dashboard']
-  if (state.loading) return <Layout breadcrumb={breadcrumb}><Loading message="Loading dashboard..." /></Layout>
-  if (state.error) return <Layout breadcrumb={breadcrumb}><ErrorMessage message={state.error} onRetry={load} /></Layout>
-
-  const d = state.data
-  const cards = [
-    { label: 'Total Students', value: d.totalStudents, icon: 'bi-people', bg: 'bg-indigo-soft' },
-    { label: 'Total Courses', value: d.totalCourses, icon: 'bi-mortarboard', bg: 'bg-teal-soft' },
-    { label: "Today's Attendance", value: `${d.todaysAttendance}%`, icon: 'bi-calendar-check', bg: 'bg-teal-soft' },
-    { label: 'Pending Tasks', value: d.pendingTasks, icon: 'bi-hourglass-split', bg: 'bg-amber-soft' },
-    { label: 'Submitted Tasks', value: d.submittedTasks, icon: 'bi-inbox', bg: 'bg-indigo-soft' },
-    { label: 'Total Materials', value: d.totalMaterials, icon: 'bi-folder2-open', bg: 'bg-indigo-soft' },
-  ]
+  const courses = [...new Set(state.students.map((s) => s.course).filter(Boolean))]
 
   return (
-    <Layout breadcrumb={breadcrumb}>
-      <h4 className="font-display fw-bold mb-1">Welcome, {user?.name} 👋</h4>
-      <p className="text-muted mb-4">Here's how your students and courses are doing today.</p>
+    <Layout breadcrumb={['Trainer', 'Dashboard']}>
+      <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+        <h4 className="font-display fw-bold mb-0">Student Progress</h4>
+        <Link to="/trainer/students/register" className="btn btn-primary btn-sm">
+          <i className="bi bi-person-plus me-1"></i>Register Student
+        </Link>
+      </div>
 
-      <div className="row">
-        {cards.map((c) => (
-          <div className="col-sm-6 col-lg-4 col-xl-2" key={c.label}>
-            <div className="stat-card mb-4">
-              <span className={`stat-icon ${c.bg}`}><i className={`bi ${c.icon}`}></i></span>
-              <div className="stat-value">{c.value}</div>
-              <div className="stat-label">{c.label}</div>
+      <div className="d-flex gap-2 flex-wrap mb-4">
+        <input
+          type="text"
+          className="form-control form-control-sm"
+          style={{ maxWidth: 260 }}
+          placeholder="Search by name or student ID..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <select
+          className="form-select form-select-sm"
+          style={{ maxWidth: 200 }}
+          value={course}
+          onChange={(e) => setCourse(e.target.value)}
+        >
+          <option value="">All Courses</option>
+          {courses.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+      </div>
+
+      {state.loading && <Loading message="Loading students..." />}
+      {!state.loading && state.error && (
+        <ErrorMessage message={state.error} onRetry={load} />
+      )}
+      {!state.loading && !state.error && state.students.length === 0 && (
+        <EmptyState
+          icon="bi-people"
+          title="No students registered yet"
+          description="Register a student to start tracking their progress."
+        />
+      )}
+
+      {!state.loading && !state.error && state.students.length > 0 && (
+        <div className="row">
+          {state.students.map((s) => (
+            <div className="col-lg-6 mb-4" key={s._id}>
+              <div className="surface-card p-4 h-100">
+                <div className="d-flex justify-content-between align-items-start mb-3">
+                  <div>
+                    <h6 className="fw-semibold mb-1">{s.name}</h6>
+                    <p className="text-muted small mb-0">{s.studentId} • {s.course}</p>
+                  </div>
+                  <Link
+                    to={`/trainer/students/${s._id}`}
+                    className="btn btn-outline-secondary btn-sm"
+                  >
+                    View
+                  </Link>
+                </div>
+                <ProgressBar label="Attendance" percent={s.attendance} />
+                <ProgressBar label="Learning Progress" percent={s.progress} />
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="surface-card p-4">
-        <h6 className="fw-semibold mb-3">Student Progress Overview</h6>
-        {d.students.slice(0, 5).map((s) => (
-          <ProgressBar key={s.id} label={`${s.name} — ${s.course}`} percent={s.progress} />
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </Layout>
   )
 }
