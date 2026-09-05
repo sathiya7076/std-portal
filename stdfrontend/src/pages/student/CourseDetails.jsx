@@ -1,86 +1,79 @@
 import React, { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import Loading from '../../components/Loading'
 import ErrorMessage from '../../components/ErrorMessage'
 import EmptyState from '../../components/EmptyState'
+import MaterialCard from '../../components/MaterialCard'
 import courseService from '../../services/courseService'
+import materialService from '../../services/materialService'
 
-export default function CourseDetails() {
+export default function StudentCourseDetail() {
   const { id } = useParams()
-  const [state, setState] = useState({ loading: true, error: null, course: null })
+  const [state, setState] = useState({ loading: true, error: null, course: null, materials: [] })
 
   const load = async () => {
-    setState({ loading: true, error: null, course: null })
+    setState((s) => ({ ...s, loading: true, error: null }))
     try {
-      const course = await courseService.getCourseById(id)
-      setState({ loading: false, error: null, course })
+      const courses = await courseService.getAllCourses()
+      const course = courses.find((c) => String(c.id) === String(id))
+      if (!course) {
+        setState({ loading: false, error: 'Course not found.', course: null, materials: [] })
+        return
+      }
+      const materials = await materialService.getMaterialsByCourse(course.id)
+      setState({ loading: false, error: null, course, materials })
     } catch {
-      setState({ loading: false, error: 'Unable to load this course.', course: null })
+      setState({ loading: false, error: 'Unable to load this course.', course: null, materials: [] })
     }
   }
 
   useEffect(() => { load() }, [id])
 
-  const breadcrumb = ['Student', 'Courses', state.course?.name || '...']
+  const breadcrumb = ['Student', 'Courses', 'Details']
 
-  if (state.loading) return <Layout breadcrumb={breadcrumb}><Loading message="Loading course details..." /></Layout>
+  if (state.loading) return <Layout breadcrumb={breadcrumb}><Loading message="Loading course..." /></Layout>
   if (state.error) return <Layout breadcrumb={breadcrumb}><ErrorMessage message={state.error} onRetry={load} /></Layout>
-  if (!state.course) return <Layout breadcrumb={breadcrumb}><EmptyState icon="bi-mortarboard" title="Course not found" /></Layout>
-
-  const c = state.course
 
   return (
     <Layout breadcrumb={breadcrumb}>
-      <Link to="/student/courses" className="text-decoration-none small text-muted d-inline-flex align-items-center mb-3">
-        <i className="bi bi-arrow-left me-1"></i> Back to Courses
-      </Link>
+      <h4 className="font-display fw-bold mb-4">{state.course.name}</h4>
 
-      <div className="row">
-        <div className="col-lg-7 mb-4">
-          <div className="surface-card p-4 mb-4">
-            <h4 className="font-display fw-bold mb-2">{c.name}</h4>
-            <p className="text-muted mb-3">{c.description}</p>
-            <div className="row text-center">
-              <div className="col-4">
-                <div className="fw-bold">{c.duration}</div>
-                <div className="text-muted small">Duration</div>
-              </div>
-              <div className="col-4">
-                <div className="fw-bold">₹{c.fees.toLocaleString('en-IN')}</div>
-                <div className="text-muted small">Course Fees</div>
-              </div>
-              <div className="col-4">
-                <div className="fw-bold">{c.trainer}</div>
-                <div className="text-muted small">Trainer</div>
-              </div>
-            </div>
+      <div className="surface-card p-4 mb-4">
+        <div className="row">
+          <div className="col-md-3 mb-2">
+            <div className="text-muted small">Fees</div>
+            <div className="fw-semibold">{state.course.fees}</div>
           </div>
-
-          <div className="surface-card p-4">
-            <h6 className="fw-semibold mb-3">Technologies Used</h6>
-            <div className="d-flex flex-wrap gap-2">
-              {c.technologies.map((t) => (
-                <span key={t} className="badge bg-indigo-soft px-3 py-2">{t}</span>
-              ))}
-            </div>
+          <div className="col-md-3 mb-2">
+            <div className="text-muted small">Duration</div>
+            <div className="fw-semibold">{state.course.duration}</div>
+          </div>
+          <div className="col-md-6 mb-2">
+            <div className="text-muted small">Roadmap</div>
+            <div className="fw-semibold">{state.course.roadmap}</div>
           </div>
         </div>
-
-        <div className="col-lg-5 mb-4">
-          <div className="surface-card p-4">
-            <h6 className="fw-semibold mb-3">Course Roadmap</h6>
-            <div className="roadmap-track">
-              {c.roadmap.map((step, idx) => (
-                <React.Fragment key={step}>
-                  <div className={`roadmap-node ${idx === c.roadmap.length - 1 ? 'final' : ''}`}>{step}</div>
-                  {idx !== c.roadmap.length - 1 && <div className="roadmap-arrow">↓</div>}
-                </React.Fragment>
-              ))}
-            </div>
+        {state.course.description && (
+          <div className="mt-3">
+            <div className="text-muted small">Full Details</div>
+            <div>{state.course.description}</div>
           </div>
-        </div>
+        )}
       </div>
+
+      <h6 className="fw-semibold mb-3">Uploaded Materials</h6>
+      {state.materials.length === 0 ? (
+        <EmptyState
+          icon="bi-folder2-open"
+          title="No materials yet"
+          message="The trainer hasn't uploaded materials for this course yet."
+        />
+      ) : (
+        <div className="row">
+          {state.materials.map((m) => <MaterialCard key={m.id} material={m} />)}
+        </div>
+      )}
     </Layout>
   )
 }

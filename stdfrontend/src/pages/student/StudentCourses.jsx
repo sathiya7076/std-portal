@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import Loading from '../../components/Loading'
 import ErrorMessage from '../../components/ErrorMessage'
@@ -8,6 +8,7 @@ import courseService from '../../services/courseService'
 
 export default function StudentCourses() {
   const [state, setState] = useState({ loading: true, error: null, courses: [] })
+  const navigate = useNavigate()
 
   const load = async () => {
     setState({ loading: true, error: null, courses: [] })
@@ -37,7 +38,13 @@ export default function StudentCourses() {
       {state.error && <ErrorMessage message={state.error} onRetry={load} />}
       {!state.loading && !state.error && (
         <div className="row">
-          {state.courses.map((c) => <CourseCard key={c.id} course={c} />)}
+          {state.courses.map((c) => (
+            <CourseCard
+              key={c.id ?? c._id}
+              course={c}
+              onClick={() => navigate(`/student/courses/${c.id ?? c._id}`)}
+            />
+          ))}
         </div>
       )}
     </Layout>

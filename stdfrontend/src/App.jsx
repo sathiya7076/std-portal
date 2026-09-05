@@ -15,6 +15,7 @@ import MaterialsByCourse from './pages/student/MaterialsByCourse'
 import StudentTasks from './pages/student/StudentTasks'
 import TaskDetails from './pages/student/TaskDetails'
 import StudentFees from './pages/student/StudentFees'
+import PaymentModal from './pages/student/Paymentmodel'
 import StudentProfile from './pages/student/StudentProfile'
 import StudentNotifications from './pages/student/StudentNotifications'
 
