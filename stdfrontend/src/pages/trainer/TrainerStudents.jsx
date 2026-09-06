@@ -33,11 +33,31 @@ export default function TrainerStudents() {
   useEffect(() => { setPage(1) }, [search, course, sortBy])
 
   const handleDelete = async () => {
-    // FIXED: use _id (real Mongo ID), not studentId (display code) —
-    // DELETE /students/:id needs the real document ID.
-    await studentService.deleteStudent(toDelete._id)
-    setState((s) => ({ ...s, students: s.students.filter((st) => st._id !== toDelete._id) }))
-    setToDelete(null)
+    try {
+      // FIXED: use _id (real Mongo ID), not studentId (display code) —
+      // DELETE /students/:id needs the real document ID.
+      await studentService.deleteStudent(toDelete._id)
+      setState((s) => ({ ...s, students: s.students.filter((st) => st._id !== toDelete._id) }))
+    } catch (err) {
+      if (err.response?.status === 404) {
+        // ADDED: backend had no document with this _id — most likely the
+        // rendered list was stale (already deleted elsewhere, or a
+        // duplicate click). Drop it locally instead of surfacing an error.
+        console.warn('[DEBUG] Student already deleted (stale list), removing locally:', toDelete._id)
+        setState((s) => ({ ...s, students: s.students.filter((st) => st._id !== toDelete._id) }))
+      } else {
+        // ADDED: log the real backend response for anything else so
+        // future failures aren't silent/uncaught.
+        console.error('[DEBUG] deleteStudent failed:', {
+          id: toDelete._id,
+          status: err.response?.status,
+          body: err.response?.data,
+        })
+        setState((s) => ({ ...s, error: 'Failed to delete student. Please refresh and try again.' }))
+      }
+    } finally {
+      setToDelete(null)
+    }
   }
 
   const breadcrumb = ['Trainer', 'Students']

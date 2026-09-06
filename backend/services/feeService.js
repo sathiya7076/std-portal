@@ -1,4 +1,5 @@
 const Fee = require("../models/Fee");
+const Payment = require("../models/Payment");
 
 /**
  * Computes total pending fee amount across all fee records for a student.
@@ -11,7 +12,18 @@ const getStudentFeeSummary = async (studentId) => {
   const paidAmount = feeRecords.reduce((sum, f) => sum + f.paidAmount, 0);
   const pendingAmount = Math.max(totalFees - paidAmount, 0);
 
-  return { totalFees, paidAmount, pendingAmount, records: feeRecords };
+  const payments = await Payment.find({ studentId }).sort({ paidAt: -1 });
+  const history = payments.map((p) => ({
+    date: p.paidAt.toISOString().slice(0, 10),
+    amount: p.amount,
+    method: p.method,
+    status: "Paid",
+    receiptNumber: p.receiptNumber,
+    transactionRef: p.transactionRef,
+    feeId: p.feeId,
+  }));
+
+  return { totalFees, paidAmount, pendingAmount, records: feeRecords, history };
 };
 
 /**

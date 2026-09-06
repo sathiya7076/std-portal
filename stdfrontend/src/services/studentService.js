@@ -116,8 +116,28 @@ const studentService = {
 
   async getAttendance() {
     if (USE_MOCK) return mockDelay({ ...mockAttendance })
-    const { data } = await api.get('/students/me/attendance')
-    return extractData(data)
+    try {
+      // FIXED: studentRoutes.js (CONFIRMED, has no attendance routes at
+      // all — its own comment says self-service attendance/profile lives
+      // in the singular "student" namespace, e.g. studentSelfRoutes.js /
+      // attendanceRoutes.js). '/students/me/attendance' 404'd because
+      // nothing in that plural CRUD router could ever match it.
+      // markMyAttendance() below already confirms POST /attendance/checkin
+      // works, so GET /attendance/me follows the same namespace.
+      // NOTE: if studentSelfRoutes.js shows a different exact path,
+      // only this URL string needs to change.
+      const { data } = await api.get('/attendance/me')
+      return extractData(data)
+    } catch (err) {
+      // DEBUG (added): log exact backend response so we know if this is a
+      // wrong-route 404 or a route that exists but rejects the request.
+      console.error('[DEBUG] getAttendance failed:', {
+        url: err.config?.url,
+        status: err.response?.status,
+        body: err.response?.data,
+      })
+      throw err
+    }
   },
 
   // Student self-service attendance check-in, called by
@@ -131,8 +151,29 @@ const studentService = {
 
   async getLearningProgress() {
     if (USE_MOCK) return mockDelay([...mockLearningProgress])
-    const { data } = await api.get('/students/me/progress')
-    return extractData(data)
+    try {
+      // FIXED: studentRoutes.js (CONFIRMED) only exposes
+      // GET /students/:id/progress — that's a Mongo _id param, not a
+      // self-service "me" endpoint. Calling it with "me" hits the :id
+      // slot, Mongoose CastError's on findById("me"), backend catches it
+      // and returns 400 — matches the exact error seen in the logs.
+      // Self-service progress belongs in the singular "/student"
+      // namespace, matching getProfile()'s working '/student/profile'.
+      // NOTE: confirm this exact path against studentSelfRoutes.js — if
+      // it differs, only this URL string needs to change.
+      const { data } = await api.get('/student/progress')
+      return extractData(data)
+    } catch (err) {
+      // DEBUG (added): 400 usually means the route exists but rejects
+      // something — this will show the backend's actual validation
+      // message.
+      console.error('[DEBUG] getLearningProgress failed:', {
+        url: err.config?.url,
+        status: err.response?.status,
+        body: err.response?.data,
+      })
+      throw err
+    }
   },
 
   async registerFingerprint() {
@@ -203,5 +244,10 @@ const studentService = {
     return extractData(data)
   },
 }
+
+// --- Addition below: alias so StudentRegister.jsx's call to
+// getMyAttendance() stops throwing "is not a function". It just forwards
+// to the existing getAttendance() — inherits the fixed endpoint above.
+studentService.getMyAttendance = (...args) => studentService.getAttendance(...args)
 
 export default studentService
