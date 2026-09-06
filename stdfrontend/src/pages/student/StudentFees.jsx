@@ -5,6 +5,13 @@ import ErrorMessage from '../../components/ErrorMessage'
 import PaymentModal from './Paymentmodel'
 import feeService from '../../services/feeService'
 
+// ADDED: safe formatter so a null/undefined/non-numeric fee value can't
+// throw ".toLocaleString is not a function" and crash the page.
+const formatINR = (value) => {
+  const n = Number(value)
+  return Number.isFinite(n) ? n.toLocaleString('en-IN') : '0'
+}
+
 export default function StudentFees() {
   const [state, setState] = useState({ loading: true, error: null, fees: null })
   const [downloadingId, setDownloadingId] = useState(null)
@@ -12,6 +19,8 @@ export default function StudentFees() {
   const [paying, setPaying] = useState(false)
   const [paymentError, setPaymentError] = useState(null)
   const [justPaidReceiptId, setJustPaidReceiptId] = useState(null)
+  // ADDED: surface download failures instead of leaving the spinner stuck forever
+  const [downloadError, setDownloadError] = useState(null)
 
   const load = async () => {
     setState({ loading: true, error: null, fees: null })
@@ -27,8 +36,18 @@ export default function StudentFees() {
 
   const handleDownload = async (receiptId) => {
     setDownloadingId(receiptId)
-    await feeService.downloadReceipt(receiptId)
-    setDownloadingId(null)
+    setDownloadError(null)
+    try {
+      // FIXED: no try/finally previously meant a thrown error here left
+      // setDownloadingId stuck forever, permanently disabling the button
+      // with no way to retry short of a full page reload.
+      await feeService.downloadReceipt(receiptId)
+    } catch (err) {
+      console.error('Download receipt failed:', err?.response?.data || err.message)
+      setDownloadError('Could not download the receipt. Please try again.')
+    } finally {
+      setDownloadingId(null)
+    }
   }
 
   const handlePay = async (payload) => {
@@ -73,15 +92,25 @@ export default function StudentFees() {
             <i className="bi bi-check-circle-fill me-2"></i>
             Payment successful! Your receipt is ready to download.
           </div>
-          <button
-            className="btn btn-sm btn-success"
-            onClick={() => handleDownload(justPaidReceiptId)}
-            disabled={downloadingId === justPaidReceiptId}
-          >
-            {downloadingId === justPaidReceiptId
-              ? <span className="spinner-border spinner-border-sm"></span>
-              : <><i className="bi bi-download me-1"></i>Download Receipt</>}
-          </button>
+          <div className="d-flex align-items-center gap-2">
+            <button
+              className="btn btn-sm btn-success"
+              onClick={() => handleDownload(justPaidReceiptId)}
+              disabled={downloadingId === justPaidReceiptId}
+            >
+              {downloadingId === justPaidReceiptId
+                ? <span className="spinner-border spinner-border-sm"></span>
+                : <><i className="bi bi-download me-1"></i>Download Receipt</>}
+            </button>
+            {/* ADDED: lets the user dismiss the success banner instead of it
+                sitting there permanently until they navigate away */}
+            <button
+              type="button"
+              className="btn-close"
+              aria-label="Dismiss"
+              onClick={() => setJustPaidReceiptId(null)}
+            ></button>
+          </div>
         </div>
       )}
 
@@ -89,25 +118,30 @@ export default function StudentFees() {
         <div className="alert alert-danger mb-4" role="alert">{paymentError}</div>
       )}
 
+      {/* ADDED: surfaces a failed receipt download instead of failing silently */}
+      {downloadError && (
+        <div className="alert alert-danger mb-4" role="alert">{downloadError}</div>
+      )}
+
       <div className="row mb-2">
         <div className="col-sm-6 col-lg-3">
           <div className="stat-card mb-4">
             <span className="stat-icon bg-indigo-soft"><i className="bi bi-receipt"></i></span>
-            <div className="stat-value">₹{f.totalFees.toLocaleString('en-IN')}</div>
+            <div className="stat-value">₹{formatINR(f.totalFees)}</div>
             <div className="stat-label">Course Total Fees</div>
           </div>
         </div>
         <div className="col-sm-6 col-lg-3">
           <div className="stat-card mb-4">
             <span className="stat-icon bg-teal-soft"><i className="bi bi-cash-stack"></i></span>
-            <div className="stat-value">₹{f.paidAmount.toLocaleString('en-IN')}</div>
+            <div className="stat-value">₹{formatINR(f.paidAmount)}</div>
             <div className="stat-label">Paid Amount</div>
           </div>
         </div>
         <div className="col-sm-6 col-lg-3">
           <div className="stat-card mb-4">
             <span className="stat-icon bg-coral-soft"><i className="bi bi-exclamation-circle"></i></span>
-            <div className="stat-value">₹{f.pendingAmount.toLocaleString('en-IN')}</div>
+            <div className="stat-value">₹{formatINR(f.pendingAmount)}</div>
             <div className="stat-label">Pending Amount</div>
           </div>
         </div>
@@ -131,9 +165,15 @@ export default function StudentFees() {
             <thead><tr><th>Date</th><th>Amount</th><th>Payment Status</th><th>Receipt</th></tr></thead>
             <tbody>
               {f.history.map((h, i) => (
-                <tr key={i}>
+                // FIXED: history is prepended on every payment
+                // (newest first), so key={i} reused row identity across
+                // renders and could cause React to reconcile the wrong
+                // DOM node (e.g. a stuck spinner/disabled state) against
+                // the wrong row. receiptId is unique when present; fall
+                // back to a composite only for rows that somehow lack one.
+                <tr key={h.receiptId ?? `${h.date}-${h.amount}-${i}`}>
                   <td>{h.date}</td>
-                  <td>₹{h.amount.toLocaleString('en-IN')}</td>
+                  <td>₹{formatINR(h.amount)}</td>
                   <td><span className={`badge rounded-pill ${h.status === 'Paid' ? 'bg-teal-soft' : 'bg-coral-soft'}`}>{h.status}</span></td>
                   <td>
                     {h.receiptId ? (
