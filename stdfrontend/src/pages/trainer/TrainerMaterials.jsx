@@ -5,6 +5,7 @@ import ErrorMessage from '../../components/ErrorMessage'
 import EmptyState from '../../components/EmptyState'
 import materialService from '../../services/materialService'
 import courseService from '../../services/courseService'
+import notificationService from '../../services/notificationService'
 
 const initialForm = { course: '', title: '', description: '', format: 'pdf' }
 
@@ -78,6 +79,14 @@ export default function TrainerMaterials() {
         file: selectedFile,
       })
       setState((s) => ({ ...s, materials: [material, ...s.materials] }))
+
+      // notify students that new material was added
+      try {
+        await notificationService.notifyMaterialAdded(courseName(form.course), form.title)
+      } catch (notifyErr) {
+        console.error('Failed to send material-added notification:', notifyErr)
+      }
+
       setShowForm(false)
       setForm(initialForm)
       setSelectedFile(null)

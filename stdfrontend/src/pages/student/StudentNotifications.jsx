@@ -6,13 +6,15 @@ import EmptyState from '../../components/EmptyState'
 import NotificationItem from '../../components/NotificationItem'
 import notificationService from '../../services/notificationService'
 
+const AUDIENCE = 'student'
+
 export default function StudentNotifications() {
   const [state, setState] = useState({ loading: true, error: null, notifications: [] })
 
   const load = async () => {
     setState({ loading: true, error: null, notifications: [] })
     try {
-      const notifications = await notificationService.getAll()
+      const notifications = await notificationService.getAll(AUDIENCE)
       setState({ loading: false, error: null, notifications })
     } catch {
       setState({ loading: false, error: 'Unable to load notifications.', notifications: [] })
@@ -22,12 +24,12 @@ export default function StudentNotifications() {
   useEffect(() => { load() }, [])
 
   const markRead = async (id) => {
-    const updated = await notificationService.markAsRead(id)
+    const updated = await notificationService.markAsRead(id, AUDIENCE)
     setState((s) => ({ ...s, notifications: updated }))
   }
 
   const markAllRead = async () => {
-    const updated = await notificationService.markAllAsRead()
+    const updated = await notificationService.markAllAsRead(AUDIENCE)
     setState((s) => ({ ...s, notifications: updated }))
   }
 

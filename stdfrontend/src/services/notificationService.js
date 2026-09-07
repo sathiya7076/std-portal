@@ -16,33 +16,42 @@ const notificationService = {
     return data
   },
 
-  async markAsRead(id) {
+  async markAsRead(id, audience) {
     if (USE_MOCK) {
       notificationsStore = notificationsStore.map((n) => (n.id === id ? { ...n, read: true } : n))
-      return mockDelay([...notificationsStore], 300)
+      const list = audience
+        ? notificationsStore.filter((n) => !n.audience || n.audience === audience)
+        : notificationsStore
+      return mockDelay([...list], 300)
     }
     const { data } = await api.put(`/notifications/${id}/read`)
     return data
   },
 
-  async markAllAsRead() {
+  async markAllAsRead(audience) {
     if (USE_MOCK) {
-      notificationsStore = notificationsStore.map((n) => ({ ...n, read: true }))
-      return mockDelay([...notificationsStore], 400)
+      notificationsStore = notificationsStore.map((n) =>
+        !audience || !n.audience || n.audience === audience ? { ...n, read: true } : n
+      )
+      const list = audience
+        ? notificationsStore.filter((n) => !n.audience || n.audience === audience)
+        : notificationsStore
+      return mockDelay([...list], 400)
     }
     const { data } = await api.put('/notifications/read-all')
     return data
   },
 
   // --- Additions below: needed so trainer actions can actually create
-  // notifications. Nothing above this line was changed. ---
+  // notifications. Nothing above this line was changed except audience-aware
+  // filtering in markAsRead / markAllAsRead. ---
 
   // Generic creator. `audience` controls who sees it: 'student', 'trainer',
   // or omit for everyone. Call this from wherever the trainer action lives
   // (addCourse, addMaterial, assignTask, updateX, etc).
   async addNotification({ title, message, type = 'info', audience } = {}) {
     const notification = {
-      id: Date.now(), // matches the numeric id style used by markAsRead
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, // collision-safe even in tight loops
       title,
       message,
       type,        // e.g. 'course', 'material', 'task', 'update'

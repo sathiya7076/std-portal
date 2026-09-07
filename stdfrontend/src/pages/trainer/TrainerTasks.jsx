@@ -3,6 +3,7 @@ import Layout from '../../components/Layout'
 import Loading from '../../components/Loading'
 import ErrorMessage from '../../components/ErrorMessage'
 import taskService from '../../services/taskService'
+import notificationService from '../../services/notificationService'
 import { mockCourses } from '../../mock/mockData'
 
 const initialForm = { title: '', course: '', description: '', assignTo: 'All Students', dueDate: '' }
@@ -77,6 +78,15 @@ export default function TrainerTasks() {
         submission: null,
       })
       setState((s) => ({ ...s, tasks: [newTask, ...s.tasks] }))
+
+      // 👇 notify the student(s) that a task was assigned
+      try {
+        await notificationService.notifyTaskAssigned(newTask.title, form.assignTo)
+      } catch (notifyErr) {
+        // Don't let a notification failure block the task creation flow
+        console.error('Failed to send task-assigned notification:', notifyErr)
+      }
+
       setShowForm(false)
       setForm(initialForm)
       setErrors({})
@@ -112,6 +122,19 @@ export default function TrainerTasks() {
         tasks: s.tasks.map((t) => (t.id === viewingTask.id ? updatedTask : t)),
       }))
       setViewingTask(updatedTask)
+
+      // 👇 let the student know their submission was evaluated
+      try {
+        await notificationService.addNotification({
+          title: 'Task Evaluated',
+          message: `Your task "${updatedTask.title}" was graded: ${updatedTask.score}/100.`,
+          type: 'task',
+          audience: 'student',
+        })
+      } catch (notifyErr) {
+        console.error('Failed to send evaluation notification:', notifyErr)
+      }
+
       setShowEvalForm(false)
     } finally {
       setSubmittingEval(false)

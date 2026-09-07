@@ -8,6 +8,11 @@ import { useAuth } from '../../context/AuthContext'
 import courseService from '../../services/courseService'
 import materialService from '../../services/materialService'
 
+const formatINR = (value) => {
+  const n = Number(value)
+  return Number.isFinite(n) ? `₹${n.toLocaleString('en-IN')}` : '—'
+}
+
 export default function MyCourse() {
   const { user } = useAuth()
   const [state, setState] = useState({
@@ -21,15 +26,36 @@ export default function MyCourse() {
   const load = async () => {
     setState((s) => ({ ...s, loading: true, error: null, materialsError: null }))
 
+    const userCourseId = user?.courseId ?? user?.course_id
     let course = null
+
     try {
       const courses = await courseService.getAllCourses()
 
-      // Match by course id first (most reliable), fall back to matching by name
-      // in case the logged-in user object only stores the course name.
-      course = courses.find(
-        (c) => String(c.id ?? c._id) === String(user?.courseId ?? user?.course_id)
-      ) || courses.find((c) => c.name === user?.course)
+      if (!Array.isArray(courses) || courses.length === 0) {
+        console.warn('[DEBUG] getAllCourses returned empty/invalid:', courses)
+        setState({
+          loading: false,
+          error: 'Unable to load course list right now.',
+          course: null,
+          materials: [],
+          materialsError: null,
+        })
+        return
+      }
+
+      if (userCourseId != null) {
+        course = courses.find((c) => String(c.id ?? c._id) === String(userCourseId))
+      }
+      if (!course && user?.course) {
+        course = courses.find((c) => c.name === user.course)
+      }
+
+      console.log('[DEBUG] user object:', user)
+      console.log('[DEBUG] userCourseId:', userCourseId)
+      console.log('[DEBUG] user.course:', user?.course)
+      console.log('[DEBUG] courses list:', courses)
+      console.log('[DEBUG] matched course:', course)
 
       if (!course) {
         setState({
@@ -41,7 +67,12 @@ export default function MyCourse() {
         })
         return
       }
-    } catch {
+    } catch (err) {
+      console.error('[DEBUG] getAllCourses failed:', {
+        status: err?.response?.status,
+        body: err?.response?.data,
+        message: err?.message,
+      })
       setState({
         loading: false,
         error: 'Unable to load your course.',
@@ -52,13 +83,16 @@ export default function MyCourse() {
       return
     }
 
-    // Materials are fetched separately so a materials failure never
-    // hides the course/fees/duration info you already loaded.
     try {
       const courseId = course.id ?? course._id
       const materials = await materialService.getMaterialsByCourse(courseId)
       setState({ loading: false, error: null, course, materials: materials || [], materialsError: null })
-    } catch {
+    } catch (err) {
+      console.warn('[DEBUG] getMaterialsByCourse failed:', {
+        status: err?.response?.status,
+        body: err?.response?.data,
+        message: err?.message,
+      })
       setState({
         loading: false,
         error: null,
@@ -69,16 +103,29 @@ export default function MyCourse() {
     }
   }
 
-  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    console.log('[DEBUG] useEffect fired, user is:', user)
+    if (!user) return
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.courseId, user?.course_id, user?.course])
 
   const breadcrumb = ['Student', 'Courses', 'My Course']
 
-  if (state.loading) {
-    return <Layout breadcrumb={breadcrumb}><Loading message="Loading your course..." /></Layout>
+  if (!user || state.loading) {
+    return (
+      <Layout breadcrumb={breadcrumb}>
+        <Loading message="Loading your course..." />
+      </Layout>
+    )
   }
 
   if (state.error) {
-    return <Layout breadcrumb={breadcrumb}><ErrorMessage message={state.error} onRetry={load} /></Layout>
+    return (
+      <Layout breadcrumb={breadcrumb}>
+        <ErrorMessage message={state.error} onRetry={load} />
+      </Layout>
+    )
   }
 
   return (
@@ -93,7 +140,7 @@ export default function MyCourse() {
           </div>
           <div className="col-md-4 mb-2">
             <div className="text-muted small">Student ID</div>
-            <div className="fw-semibold">{user?.id ?? user?._id}</div>
+            <div className="fw-semibold">{user?.studentId ?? '—'}</div>
           </div>
           <div className="col-md-4 mb-2">
             <div className="text-muted small">Assigned Course</div>
@@ -101,7 +148,7 @@ export default function MyCourse() {
           </div>
           <div className="col-md-4 mb-2">
             <div className="text-muted small">Course Fees</div>
-            <div className="fw-semibold">{state.course.fees}</div>
+            <div className="fw-semibold">{formatINR(state.course.fees)}</div>
           </div>
           <div className="col-md-4 mb-2">
             <div className="text-muted small">Duration</div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import courseService from "../../services/courseService";
+import notificationService from "../../services/notificationService";
 
 const initialFormState = {
   name: "",
@@ -75,6 +76,14 @@ const TrainerCourses = () => {
 
       const newCourse = await courseService.createCourse(payload);
       setCourses((prev) => [newCourse, ...prev]);
+
+      // notify students that a new course was added
+      try {
+        await notificationService.notifyCourseAdded(newCourse.name);
+      } catch (notifyErr) {
+        console.error("Failed to send course-added notification:", notifyErr);
+      }
+
       setFormData(initialFormState);
       setImageFile(null);
       e.target.reset();
