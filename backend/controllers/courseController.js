@@ -1,4 +1,6 @@
 const asyncHandler = require("express-async-handler");
+const fs = require("fs");
+const path = require("path");
 const Course = require("../models/Course");
 const Trainer = require("../models/Trainer");
 const Student = require("../models/Student");
@@ -14,7 +16,6 @@ const getCourses = asyncHandler(async (req, res) => {
   const { page, limit, skip } = getPagination(req.query);
   const filter = {};
 
-  // Students only ever see active courses in the general listing
   if (req.user.role === "student") {
     filter.status = "active";
   } else if (req.query.status) {
@@ -71,6 +72,25 @@ const createCourse = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Trainer profile not found for this account");
   }
 
+  // CHANGED: req.file -> req.files, since the route now uses .fields([...])
+  // to accept both "image" and "file" in one request.
+  const uploadedImage = req.files?.image?.[0];
+  const uploadedFile = req.files?.file?.[0];
+
+  // ADDED: prefer the uploaded image file's path over a plain `image` body
+  // field (kept `image` from req.body as a fallback in case some callers
+  // still send it as a plain string/URL instead of a file).
+  const imagePath = uploadedImage
+    ? `/uploads/courses/${uploadedImage.filename}`
+    : image;
+
+  // ADDED: PDF/video course file path.
+  // ASSUMPTION: Course model has a `fileUrl` String field — please confirm
+  // by sharing Course.js, otherwise Mongoose will silently drop this field.
+  const fileUrl = uploadedFile
+    ? `/uploads/courses/${uploadedFile.filename}`
+    : undefined;
+
   const course = await Course.create({
     name,
     description,
@@ -78,7 +98,8 @@ const createCourse = asyncHandler(async (req, res) => {
     roadmap,
     duration,
     fees,
-    image,
+    image: imagePath,
+    fileUrl, // ADDED
     trainerId: trainer._id,
     status: "active",
   });
@@ -86,7 +107,6 @@ const createCourse = asyncHandler(async (req, res) => {
   trainer.courseIds.push(course._id);
   await trainer.save();
 
-  // Course becomes available to students -> notify all students
   const students = await Student.find().populate("userId", "_id");
   const studentUserIds = students.map((s) => s.userId._id);
 
@@ -128,6 +148,24 @@ const updateCourse = asyncHandler(async (req, res) => {
   updatableFields.forEach((field) => {
     if (req.body[field] !== undefined) course[field] = req.body[field];
   });
+
+  // CHANGED: req.file -> req.files (route now uses .fields([...])).
+  const uploadedImage = req.files?.image?.[0];
+  const uploadedFile = req.files?.file?.[0];
+
+  if (uploadedImage) {
+    course.image = `/uploads/courses/${uploadedImage.filename}`;
+  }
+
+  // ADDED: replace the course's PDF/video, deleting the old one from disk
+  // first (same pattern as updateMaterial in materialController.js).
+  if (uploadedFile) {
+    if (course.fileUrl) {
+      const oldPath = path.join(__dirname, "..", course.fileUrl);
+      fs.unlink(oldPath, () => {});
+    }
+    course.fileUrl = `/uploads/courses/${uploadedFile.filename}`;
+  }
 
   await course.save();
 

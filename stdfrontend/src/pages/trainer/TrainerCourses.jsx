@@ -25,9 +25,6 @@ const TrainerCourses = () => {
 
   const fetchCourses = async () => {
     try {
-      // FIXED: courseService.getCourses() does not exist — the service
-      // only exports getAllCourses(). This was throwing every time and
-      // being silently swallowed below, so the list never loaded.
       const data = await courseService.getAllCourses();
       setCourses(data);
     } catch (err) {
@@ -77,7 +74,6 @@ const TrainerCourses = () => {
       const newCourse = await courseService.createCourse(payload);
       setCourses((prev) => [newCourse, ...prev]);
 
-      // notify students that a new course was added
       try {
         await notificationService.notifyCourseAdded(newCourse.name);
       } catch (notifyErr) {
@@ -88,9 +84,6 @@ const TrainerCourses = () => {
       setImageFile(null);
       e.target.reset();
 
-      // Re-fetch from the server so the list reflects the real saved
-      // record (including the trainer populate) rather than trusting
-      // the raw create response's shape.
       await fetchCourses();
     } catch (err) {
       const serverErrors = err.response?.data?.errors;
@@ -104,52 +97,95 @@ const TrainerCourses = () => {
 
   return (
     <div style={{ padding: "1rem" }}>
-      <h2>Manage Courses</h2>
+      {/* ADDED: style-only block for spacing + hover effects, nothing else changed */}
+      <style>{`
+        .tc-form-row { margin-bottom: 1rem; }
+        .tc-form-row input,
+        .tc-form-row textarea,
+        .tc-form-row select {
+          padding: 8px 10px;
+          border: 1px solid #d0d5dd;
+          border-radius: 6px;
+          width: 100%;
+          max-width: 420px;
+          box-sizing: border-box;
+        }
+        .tc-submit-btn {
+          margin-top: 0.5rem;
+          padding: 8px 20px;
+          border: none;
+          border-radius: 6px;
+          background: #4f46e5;
+          color: #fff;
+          cursor: pointer;
+          transition: background 0.15s ease, transform 0.1s ease;
+        }
+        .tc-submit-btn:hover:not(:disabled) {
+          background: #4338ca;
+          transform: translateY(-1px);
+        }
+        .tc-submit-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+        .tc-table { margin-top: 1.5rem; }
+        .tc-table tbody tr {
+          transition: background 0.15s ease;
+        }
+        .tc-table tbody tr:hover {
+          background: #f5f6ff;
+        }
+        .tc-table th, .tc-table td {
+          padding: 10px 8px;
+        }
+      `}</style>
+
+      <h2 style={{ marginBottom: "1rem" }}>Manage Courses</h2>
 
       <form onSubmit={handleCreate} style={{ marginBottom: "2rem" }}>
         {errors.length > 0 && (
-          <ul style={{ color: "red" }}>
+          <ul style={{ color: "red", marginBottom: "1rem" }}>
             {errors.map((msg, i) => (
               <li key={i}>{msg}</li>
             ))}
           </ul>
         )}
 
-        <div>
+        <div className="tc-form-row">
           <input name="name" value={formData.name} onChange={handleChange} placeholder="Course name" required />
         </div>
-        <div>
+        <div className="tc-form-row">
           <textarea name="description" value={formData.description} onChange={handleChange} placeholder="Description" />
         </div>
-        <div>
+        <div className="tc-form-row">
           <input name="technologies" value={formData.technologies} onChange={handleChange} placeholder="Technologies (comma separated)" />
         </div>
-        <div>
+        <div className="tc-form-row">
           <textarea name="roadmap" value={formData.roadmap} onChange={handleChange} placeholder="Roadmap outline" />
         </div>
-        <div>
+        <div className="tc-form-row">
           <input name="duration" value={formData.duration} onChange={handleChange} placeholder="e.g. 6 Months" required />
         </div>
-        <div>
+        <div className="tc-form-row">
           <input type="number" name="fees" value={formData.fees} onChange={handleChange} placeholder="Fees" min="0" required />
         </div>
-        <div>
+        <div className="tc-form-row">
           <select name="status" value={formData.status} onChange={handleChange}>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
             <option value="archived">Archived</option>
           </select>
         </div>
-        <div>
+        <div className="tc-form-row">
           <input type="file" accept="image/*" onChange={handleImageChange} />
         </div>
 
-        <button type="submit" disabled={loading}>
+        <button type="submit" className="tc-submit-btn" disabled={loading}>
           {loading ? "Creating..." : "Create Course"}
         </button>
       </form>
 
-      <table border="1" cellPadding="8" style={{ width: "100%", borderCollapse: "collapse" }}>
+      <table border="1" cellPadding="8" className="tc-table" style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr>
             <th>Name</th>
