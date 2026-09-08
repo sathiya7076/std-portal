@@ -12,11 +12,23 @@ export default function MaterialsByCourse() {
 
   const load = async () => {
     setState({ loading: true, error: null, materials: [] })
+    // ADDED: debug — confirm the route param is actually reaching this component
+    console.log('[DEBUG] useParams courseId:', courseId)
     try {
       const materials = await materialService.getMaterialsByCourse(courseId)
+      // ADDED: debug — see the raw response before any filtering/defaulting
+      console.log('[DEBUG] raw materials response:', materials)
+      if (Array.isArray(materials) && materials.length > 0) {
+        console.log('[DEBUG] first material object:', materials[0])
+      }
       setState({ loading: false, error: null, materials: Array.isArray(materials) ? materials : [] })
     } catch (err) {
-      console.error('Failed to load study materials:', err)
+      // ADDED: debug — surface the actual backend response instead of just the generic message
+      console.error('[DEBUG] Failed to load study materials:', {
+        status: err?.response?.status,
+        body: err?.response?.data,
+        message: err?.message,
+      })
       setState({ loading: false, error: 'Unable to load study materials.', materials: [] })
     }
   }
@@ -24,9 +36,15 @@ export default function MaterialsByCourse() {
   useEffect(() => { load() }, [courseId])
 
   const openMaterial = (material) => {
+    // ADDED: debug — confirm the exact field name / value used to build the file URL
+    console.log('[DEBUG] material clicked:', material)
     const url = materialService.resolveFileUrl(material.fileUrl)
+    console.log('[DEBUG] resolved file url:', url)
     if (url) {
       window.open(url, '_blank', 'noopener,noreferrer')
+    } else {
+      // ADDED: debug — this was previously silent; now it's visible when a click does nothing
+      console.warn('[DEBUG] No URL resolved for material — check the field name materialService expects (fileUrl vs url vs filePath, etc).')
     }
   }
 

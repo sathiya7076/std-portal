@@ -7,6 +7,7 @@ import MaterialCard from '../../components/MaterialCard'
 import { useAuth } from '../../context/AuthContext'
 import courseService from '../../services/courseService'
 import materialService from '../../services/materialService'
+import studentService from '../../services/studentService' // ADDED: user (auth context) doesn't carry course info — the Student profile does
 
 const formatINR = (value) => {
   const n = Number(value)
@@ -21,15 +22,35 @@ export default function MyCourse() {
     course: null,
     materials: [],
     materialsError: null,
+    profile: null, // ADDED: studentId lives on the Student profile, not on `user` (auth context) — CONFIRMED via [DEBUG] logs
   })
 
   const load = async () => {
     setState((s) => ({ ...s, loading: true, error: null, materialsError: null }))
 
-    const userCourseId = user?.courseId ?? user?.course_id
     let course = null
 
     try {
+      // ADDED: fetch the Student profile — CONFIRMED (via [DEBUG] logs)
+      // that useAuth()'s `user` only carries auth/login fields (id,
+      // name, email, role) — never course info. The real course
+      // assignment lives on the Student document, same source
+      // StudentFees.jsx already uses via studentService.getProfile().
+      const profile = await studentService.getProfile()
+      console.log('[DEBUG] student profile:', profile)
+
+      // FIXED: CONFIRMED via [DEBUG] log that profile.course is already
+      // the populated course object itself ({_id, name, ...}), not a
+      // plain name string, and profile.courseId doesn't exist on this
+      // object at all. Previously this compared a string to an object
+      // and could never match. Handle both possible shapes (populated
+      // object vs plain name string) so this keeps working either way.
+      const profileCourse = profile?.course
+      const profileCourseId =
+        typeof profileCourse === 'object' ? profileCourse?._id ?? profileCourse?.id : undefined
+      const profileCourseName =
+        typeof profileCourse === 'object' ? profileCourse?.name : profileCourse
+
       const courses = await courseService.getAllCourses()
 
       if (!Array.isArray(courses) || courses.length === 0) {
@@ -44,16 +65,16 @@ export default function MyCourse() {
         return
       }
 
-      if (userCourseId != null) {
-        course = courses.find((c) => String(c.id ?? c._id) === String(userCourseId))
+      // Match by ID first (most reliable), fall back to matching by name.
+      if (profileCourseId != null) {
+        course = courses.find((c) => String(c.id ?? c._id) === String(profileCourseId))
       }
-      if (!course && user?.course) {
-        course = courses.find((c) => c.name === user.course)
+      if (!course && profileCourseName) {
+        course = courses.find((c) => c.name === profileCourseName)
       }
 
-      console.log('[DEBUG] user object:', user)
-      console.log('[DEBUG] userCourseId:', userCourseId)
-      console.log('[DEBUG] user.course:', user?.course)
+      console.log('[DEBUG] profileCourseId:', profileCourseId)
+      console.log('[DEBUG] profileCourseName:', profileCourseName)
       console.log('[DEBUG] courses list:', courses)
       console.log('[DEBUG] matched course:', course)
 
@@ -64,11 +85,32 @@ export default function MyCourse() {
           course: null,
           materials: [],
           materialsError: null,
+          profile, // ADDED: keep profile even in the "no course" error state, in case studentId is still shown elsewhere
         })
         return
       }
+
+      try {
+        const courseId = course.id ?? course._id
+        const materials = await materialService.getMaterialsByCourse(courseId)
+        setState({ loading: false, error: null, course, materials: materials || [], materialsError: null, profile })
+      } catch (err) {
+        console.warn('[DEBUG] getMaterialsByCourse failed:', {
+          status: err?.response?.status,
+          body: err?.response?.data,
+          message: err?.message,
+        })
+        setState({
+          loading: false,
+          error: null,
+          course,
+          materials: [],
+          materialsError: 'Unable to load materials right now.',
+          profile, // ADDED
+        })
+      }
     } catch (err) {
-      console.error('[DEBUG] getAllCourses failed:', {
+      console.error('[DEBUG] load failed:', {
         status: err?.response?.status,
         body: err?.response?.data,
         message: err?.message,
@@ -79,27 +121,9 @@ export default function MyCourse() {
         course: null,
         materials: [],
         materialsError: null,
+        profile: null,
       })
       return
-    }
-
-    try {
-      const courseId = course.id ?? course._id
-      const materials = await materialService.getMaterialsByCourse(courseId)
-      setState({ loading: false, error: null, course, materials: materials || [], materialsError: null })
-    } catch (err) {
-      console.warn('[DEBUG] getMaterialsByCourse failed:', {
-        status: err?.response?.status,
-        body: err?.response?.data,
-        message: err?.message,
-      })
-      setState({
-        loading: false,
-        error: null,
-        course,
-        materials: [],
-        materialsError: 'Unable to load materials right now.',
-      })
     }
   }
 
@@ -108,7 +132,7 @@ export default function MyCourse() {
     if (!user) return
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.courseId, user?.course_id, user?.course])
+  }, [user])
 
   const breadcrumb = ['Student', 'Courses', 'My Course']
 
@@ -140,7 +164,10 @@ export default function MyCourse() {
           </div>
           <div className="col-md-4 mb-2">
             <div className="text-muted small">Student ID</div>
-            <div className="fw-semibold">{user?.studentId ?? '—'}</div>
+            {/* FIXED: studentId only exists on the Student profile, never on
+                `user` from useAuth() — CONFIRMED via [DEBUG] logs (user only
+                has id/name/email/role). Read it from state.profile instead. */}
+            <div className="fw-semibold">{state.profile?.studentId ?? '—'}</div>
           </div>
           <div className="col-md-4 mb-2">
             <div className="text-muted small">Assigned Course</div>

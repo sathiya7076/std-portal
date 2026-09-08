@@ -16,14 +16,38 @@ export default function StudentCourseDetail() {
     setState((s) => ({ ...s, loading: true, error: null }))
     try {
       const courses = await courseService.getAllCourses()
+      // ADDED: debug — confirm whether course objects actually have an
+      // `id` field, or only `_id` (this was the exact bug in MyCourse.jsx).
+      console.log('[DEBUG] URL param id:', id)
+      console.log('[DEBUG] courses list:', courses)
+      if (courses[0]) {
+        console.log('[DEBUG] first course.id:', courses[0].id)
+        console.log('[DEBUG] first course._id:', courses[0]._id)
+      }
+
       const course = courses.find((c) => String(c.id) === String(id))
+      // ADDED: debug — see what actually got matched (or didn't)
+      console.log('[DEBUG] matched course:', course)
+
       if (!course) {
         setState({ loading: false, error: 'Course not found.', course: null, materials: [] })
         return
       }
+      // ADDED: debug — this is the exact value being sent to fetch materials
+      console.log('[DEBUG] course.id passed to getMaterialsByCourse:', course.id)
+
       const materials = await materialService.getMaterialsByCourse(course.id)
+      // ADDED: debug — see what came back
+      console.log('[DEBUG] materials returned:', materials)
+
       setState({ loading: false, error: null, course, materials })
-    } catch {
+    } catch (err) {
+      // ADDED: debug — surface the real error instead of swallowing it silently
+      console.error('[DEBUG] load failed:', {
+        status: err?.response?.status,
+        body: err?.response?.data,
+        message: err?.message,
+      })
       setState({ loading: false, error: 'Unable to load this course.', course: null, materials: [] })
     }
   }
