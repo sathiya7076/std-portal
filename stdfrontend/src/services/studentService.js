@@ -243,6 +243,54 @@ const studentService = {
     const { data } = await api.delete(`/students/${mongoId}`)
     return extractData(data)
   },
+
+  // ADDED: trainer-side "today's attendance for all students".
+  // CONFIRMED route (attendanceRoutes.js): GET /attendance — trainer
+  // gets all records, student gets own. There's no "today" filter
+  // server-side, so this fetches everything and filters to today's
+  // date here. Field names below are best-guesses across common
+  // shapes — the [DEBUG] log will show the real shape on first call
+  // so we can lock this down exactly instead of guessing further.
+  async getTodayAttendanceMap() {
+    if (USE_MOCK) return mockDelay({})
+    try {
+      const { data } = await api.get('/attendance')
+      const records = extractArray(data)
+
+      if (records.length > 0) {
+        console.log('[DEBUG] Raw attendance record from backend:', records[0])
+      }
+
+      const todayStr = new Date().toDateString()
+      const map = {}
+      records.forEach((r) => {
+        const recordDate = r.date ?? r.attendanceDate ?? r.createdAt
+        if (!recordDate || new Date(recordDate).toDateString() !== todayStr) return
+
+        // Resolve which student this record belongs to — could be a
+        // populated object, a raw ObjectId, or a human-readable code.
+        const studentKey =
+          r.studentId ??
+          (typeof r.student === 'object' ? (r.student?._id ?? r.student?.studentId) : r.student) ??
+          r.student_id
+
+        if (!studentKey) return
+
+        const status =
+          r.status ?? (r.present === true ? 'present' : r.present === false ? 'absent' : undefined)
+
+        map[studentKey] = { status, currentActivity: r.currentActivity ?? r.activity ?? null }
+      })
+      return map
+    } catch (err) {
+      console.error('[DEBUG] getTodayAttendanceMap failed:', {
+        url: err.config?.url,
+        status: err.response?.status,
+        body: err.response?.data,
+      })
+      return {}
+    }
+  },
 }
 
 // --- Addition below: alias so StudentRegister.jsx's call to

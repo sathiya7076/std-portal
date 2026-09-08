@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import Loading from '../../components/Loading'
@@ -21,22 +21,76 @@ export default function TrainerDashboard() {
   const [search, setSearch] = useState('')
   const [course, setCourse] = useState('')
 
-  const load = async () => {
+  // FIX: master course list, built once from the unfiltered dataset,
+  // so the dropdown doesn't shrink to whatever the current filter shows.
+  const [allCourses, setAllCourses] = useState([])
+
+  // FIX: debounce the search box so we don't fire a request per keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState(search)
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
+
+  // FIX: race-condition guard. requestIdRef tracks the latest request;
+  // if an older request's response comes back after a newer one, it's ignored.
+  const requestIdRef = useRef(0)
+
+  const load = useCallback(async () => {
+    const thisRequestId = ++requestIdRef.current
     setState((prev) => ({ ...prev, loading: true, error: null }))
     try {
-      const students = await studentService.getAllStudents({ search, course })
+      const students = await studentService.getAllStudents({ search: debouncedSearch, course })
+      if (thisRequestId !== requestIdRef.current) return // a newer request won the race, ignore this one
       setState({ loading: false, error: null, students })
+
+      // Build the master course list only from an unfiltered fetch,
+      // so switching filters later never hides other courses.
+      if (!course && !debouncedSearch) {
+        setAllCourses([...new Set(students.map((s) => s.course).filter(Boolean))])
+      }
     } catch {
+      if (thisRequestId !== requestIdRef.current) return
       setState({ loading: false, error: 'Unable to load students.', students: [] })
     }
+  }, [debouncedSearch, course])
+
+  useEffect(() => { load() }, [load])
+
+  // ADDED: today's attendance + "what they're currently doing" per student.
+  // Calls studentService.getTodayAttendanceMap() (see studentService.js).
+  // If it's ever missing/renamed, this fails silently and the UI just
+  // shows "Not marked" badges — it won't crash the dashboard.
+  const [todayAttendance, setTodayAttendance] = useState({})
+  useEffect(() => {
+    let cancelled = false
+    const loadAttendance = async () => {
+      try {
+        if (typeof studentService.getTodayAttendanceMap !== 'function') return
+        const data = await studentService.getTodayAttendanceMap()
+        if (!cancelled) setTodayAttendance(data || {})
+      } catch {
+        if (!cancelled) setTodayAttendance({})
+      }
+    }
+    loadAttendance()
+    return () => { cancelled = true }
+  }, [state.students])
+
+  // FIX: check both studentId and _id as the map key, since we don't
+  // yet know for certain which one the backend attendance record uses.
+  const getAttendanceRecord = (s) => todayAttendance[s.studentId] ?? todayAttendance[s._id]
+
+  const renderAttendanceBadge = (s) => {
+    const record = getAttendanceRecord(s)
+    if (!record || !record.status) {
+      return <span className="badge bg-secondary">Not marked</span>
+    }
+    if (record.status === 'present') {
+      return <span className="badge bg-success">Present today</span>
+    }
+    return <span className="badge bg-danger">Absent today</span>
   }
-
-  // Reload whenever the trainer changes filters. If you'd rather
-  // filter client-side only, drop `search`/`course` from the deps
-  // and instead filter `state.students` below.
-  useEffect(() => { load() }, [search, course])
-
-  const courses = [...new Set(state.students.map((s) => s.course).filter(Boolean))]
 
   return (
     <Layout breadcrumb={['Trainer', 'Dashboard']}>
@@ -63,7 +117,7 @@ export default function TrainerDashboard() {
           onChange={(e) => setCourse(e.target.value)}
         >
           <option value="">All Courses</option>
-          {courses.map((c) => (
+          {allCourses.map((c) => (
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
@@ -90,6 +144,8 @@ export default function TrainerDashboard() {
                   <div>
                     <h6 className="fw-semibold mb-1">{s.name}</h6>
                     <p className="text-muted small mb-0">{s.studentId} • {s.course}</p>
+                    {/* ADDED: today's attendance status */}
+                    <div className="mt-1">{renderAttendanceBadge(s)}</div>
                   </div>
                   <Link
                     to={`/trainer/students/${s._id}`}
@@ -100,6 +156,13 @@ export default function TrainerDashboard() {
                 </div>
                 <ProgressBar label="Attendance" percent={s.attendance} />
                 <ProgressBar label="Learning Progress" percent={s.progress} />
+                {/* ADDED: current activity, if the backend ever provides one */}
+                {getAttendanceRecord(s)?.currentActivity && (
+                  <p className="text-muted small mt-2 mb-0">
+                    <i className="bi bi-activity me-1"></i>
+                    Currently: {getAttendanceRecord(s).currentActivity}
+                  </p>
+                )}
               </div>
             </div>
           ))}

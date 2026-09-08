@@ -4,9 +4,13 @@ import Loading from '../../components/Loading'
 import ErrorMessage from '../../components/ErrorMessage'
 import taskService from '../../services/taskService'
 import notificationService from '../../services/notificationService'
-import { mockCourses } from '../../mock/mockData'
+import courseService from '../../services/courseService'
 
 const initialForm = { title: '', course: '', description: '', assignTo: 'All Students', dueDate: '' }
+
+// Works whether the course object came from a Mongo-backed API (_id)
+// or mock data (id) — same helper used in TrainerMaterials.jsx.
+const getCourseId = (c) => (c ? c._id || c.id : undefined)
 
 const statusBadgeClass = (status) => {
   if (status === 'Completed') return 'bg-teal-soft'
@@ -16,6 +20,7 @@ const statusBadgeClass = (status) => {
 
 export default function TrainerTasks() {
   const [state, setState] = useState({ loading: true, error: null, tasks: [] })
+  const [courses, setCourses] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(initialForm)
   const [errors, setErrors] = useState({})
@@ -29,8 +34,13 @@ export default function TrainerTasks() {
   const load = async () => {
     setState({ loading: true, error: null, tasks: [] })
     try {
-      const tasks = await taskService.getStudentTasks()
+      // fetch tasks and the real course list together, same pattern as TrainerMaterials.jsx
+      const [tasks, courseList] = await Promise.all([
+        taskService.getStudentTasks(),
+        courseService.getAllCourses(),
+      ])
       setState({ loading: false, error: null, tasks })
+      setCourses(Array.isArray(courseList) ? courseList : [])
     } catch {
       setState({ loading: false, error: 'Unable to load tasks.', tasks: [] })
     }
@@ -79,11 +89,10 @@ export default function TrainerTasks() {
       })
       setState((s) => ({ ...s, tasks: [newTask, ...s.tasks] }))
 
-      // 👇 notify the student(s) that a task was assigned
+      // notify the student(s) that a task was assigned
       try {
         await notificationService.notifyTaskAssigned(newTask.title, form.assignTo)
       } catch (notifyErr) {
-        // Don't let a notification failure block the task creation flow
         console.error('Failed to send task-assigned notification:', notifyErr)
       }
 
@@ -123,7 +132,7 @@ export default function TrainerTasks() {
       }))
       setViewingTask(updatedTask)
 
-      // 👇 let the student know their submission was evaluated
+      // let the student know their submission was evaluated
       try {
         await notificationService.addNotification({
           title: 'Task Evaluated',
@@ -176,7 +185,9 @@ export default function TrainerTasks() {
                 <label className="form-label small fw-semibold">Course</label>
                 <select className={`form-select ${errors.course ? 'is-invalid' : ''}`} value={form.course} onChange={(e) => setForm({ ...form, course: e.target.value })}>
                   <option value="">Select course</option>
-                  {mockCourses.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+                  {courses.map((c) => (
+                    <option key={getCourseId(c)} value={c.name}>{c.name}</option>
+                  ))}
                 </select>
                 {errors.course && <div className="invalid-feedback">{errors.course}</div>}
               </div>

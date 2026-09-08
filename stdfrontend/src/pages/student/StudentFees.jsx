@@ -4,6 +4,7 @@ import Loading from '../../components/Loading'
 import ErrorMessage from '../../components/ErrorMessage'
 import PaymentModal from './Paymentmodel'
 import feeService from '../../services/feeService'
+import studentService from '../../services/studentService' // ADDED: needed to know the student's own course
 
 // ADDED: safe formatter so a null/undefined/non-numeric fee value can't
 // throw ".toLocaleString is not a function" and crash the page.
@@ -21,11 +22,20 @@ export default function StudentFees() {
   const [justPaidReceiptId, setJustPaidReceiptId] = useState(null)
   // ADDED: surface download failures instead of leaving the spinner stuck forever
   const [downloadError, setDownloadError] = useState(null)
+  // ADDED: cache the student's own studentId/course so payFees can pass them along too
+  const [studentInfo, setStudentInfo] = useState({ studentId: null, course: null })
 
   const load = async () => {
     setState({ loading: true, error: null, fees: null })
     try {
-      const fees = await feeService.getMyFees()
+      // ADDED: fetch the logged-in student's own profile first, so fees
+      // are looked up (and, if new, seeded) against their real course
+      // instead of an unrelated shared/global fee record.
+      const profile = await studentService.getProfile()
+      const info = { studentId: profile?.studentId, course: profile?.course }
+      setStudentInfo(info)
+
+      const fees = await feeService.getMyFees(info)
       setState({ loading: false, error: null, fees })
     } catch {
       setState({ loading: false, error: 'Unable to load fee details.', fees: null })
@@ -54,7 +64,9 @@ export default function StudentFees() {
     setPaying(true)
     setPaymentError(null)
     try {
-      const result = await feeService.payFees(payload)
+      // ADDED: attach studentId/course so the payment lands on this
+      // student's own fee record instead of the shared legacy one.
+      const result = await feeService.payFees({ ...payload, ...studentInfo })
       setShowPaymentModal(false)
       setJustPaidReceiptId(result.receiptId)
       await load() // refresh totals + history so the new payment shows up
@@ -70,6 +82,15 @@ export default function StudentFees() {
   if (state.error) return <Layout breadcrumb={breadcrumb}><ErrorMessage message={state.error} onRetry={load} /></Layout>
 
   const f = state.fees
+
+  // ADDED: safe array so f.history.map never crashes if a fee record
+  // has no history yet (e.g. a brand-new student with no payments).
+  const paymentHistory = Array.isArray(f.history) ? f.history : []
+
+  // ADDED: explicit numeric coercion so a stringy pendingAmount from the
+  // API can't misbehave in the ">" comparisons below.
+  const pendingAmountNum = Number(f.pendingAmount) || 0
+
   const statusBadge = f.status === 'Paid' ? 'bg-teal-soft' : f.status === 'Partially Paid' ? 'bg-amber-soft' : 'bg-coral-soft'
 
   // Student identity used to prefill the payment form.
@@ -102,8 +123,6 @@ export default function StudentFees() {
                 ? <span className="spinner-border spinner-border-sm"></span>
                 : <><i className="bi bi-download me-1"></i>Download Receipt</>}
             </button>
-            {/* ADDED: lets the user dismiss the success banner instead of it
-                sitting there permanently until they navigate away */}
             <button
               type="button"
               className="btn-close"
@@ -118,7 +137,6 @@ export default function StudentFees() {
         <div className="alert alert-danger mb-4" role="alert">{paymentError}</div>
       )}
 
-      {/* ADDED: surfaces a failed receipt download instead of failing silently */}
       {downloadError && (
         <div className="alert alert-danger mb-4" role="alert">{downloadError}</div>
       )}
@@ -149,7 +167,7 @@ export default function StudentFees() {
           <div className="stat-card mb-4">
             <span className={`badge rounded-pill ${statusBadge} mb-2`}>{f.status}</span>
             <div className="stat-label">Payment Status</div>
-            {f.pendingAmount > 0 && (
+            {pendingAmountNum > 0 && (
               <button className="btn btn-sm btn-primary mt-2" onClick={() => setShowPaymentModal(true)}>
                 <i className="bi bi-credit-card me-1"></i>Pay Now
               </button>
@@ -164,13 +182,7 @@ export default function StudentFees() {
           <table className="table table-stms align-middle">
             <thead><tr><th>Date</th><th>Amount</th><th>Payment Status</th><th>Receipt</th></tr></thead>
             <tbody>
-              {f.history.map((h, i) => (
-                // FIXED: history is prepended on every payment
-                // (newest first), so key={i} reused row identity across
-                // renders and could cause React to reconcile the wrong
-                // DOM node (e.g. a stuck spinner/disabled state) against
-                // the wrong row. receiptId is unique when present; fall
-                // back to a composite only for rows that somehow lack one.
+              {paymentHistory.map((h, i) => (
                 <tr key={h.receiptId ?? `${h.date}-${h.amount}-${i}`}>
                   <td>{h.date}</td>
                   <td>₹{formatINR(h.amount)}</td>
@@ -190,6 +202,13 @@ export default function StudentFees() {
                   </td>
                 </tr>
               ))}
+              {paymentHistory.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="text-center text-muted small py-4">
+                    No payment history yet.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
