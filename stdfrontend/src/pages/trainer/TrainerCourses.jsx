@@ -9,6 +9,7 @@ const initialFormState = {
   roadmap: "",
   duration: "",
   fees: "",
+  code: "", // ADDED
   status: "active",
 };
 
@@ -59,6 +60,7 @@ const TrainerCourses = () => {
       payload.append("roadmap", formData.roadmap);
       payload.append("duration", formData.duration);
       payload.append("fees", formData.fees);
+      payload.append("code", formData.code); // ADDED
       payload.append("status", formData.status);
 
       formData.technologies
@@ -97,7 +99,6 @@ const TrainerCourses = () => {
 
   return (
     <div style={{ padding: "1rem" }}>
-      {/* ADDED: style-only block for spacing + hover effects, nothing else changed */}
       <style>{`
         .tc-form-row { margin-bottom: 1rem; }
         .tc-form-row input,
@@ -169,6 +170,10 @@ const TrainerCourses = () => {
         <div className="tc-form-row">
           <input type="number" name="fees" value={formData.fees} onChange={handleChange} placeholder="Fees" min="0" required />
         </div>
+        {/* ADDED: course code input */}
+        <div className="tc-form-row">
+          <input name="code" value={formData.code} onChange={handleChange} placeholder="Course code (optional)" />
+        </div>
         <div className="tc-form-row">
           <select name="status" value={formData.status} onChange={handleChange}>
             <option value="active">Active</option>
@@ -189,6 +194,7 @@ const TrainerCourses = () => {
         <thead>
           <tr>
             <th>Name</th>
+            <th>Code</th>
             <th>Duration</th>
             <th>Fees</th>
             <th>Status</th>
@@ -198,7 +204,7 @@ const TrainerCourses = () => {
         <tbody>
           {courses.length === 0 ? (
             <tr>
-              <td colSpan="5" style={{ textAlign: "center" }}>
+              <td colSpan="6" style={{ textAlign: "center" }}>
                 No courses yet.
               </td>
             </tr>
@@ -206,6 +212,7 @@ const TrainerCourses = () => {
             courses.map((course) => (
               <tr key={course._id || course.id}>
                 <td>{course.name}</td>
+                <td>{course.code || "—"}</td>
                 <td>{course.duration}</td>
                 <td>{course.fees}</td>
                 <td>{course.status}</td>

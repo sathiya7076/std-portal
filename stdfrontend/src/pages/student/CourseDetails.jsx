@@ -86,18 +86,7 @@ export default function StudentCourseDetail() {
         )}
       </div>
 
-      <h6 className="fw-semibold mb-3">Uploaded Materials</h6>
-      {state.materials.length === 0 ? (
-        <EmptyState
-          icon="bi-folder2-open"
-          title="No materials yet"
-          message="The trainer hasn't uploaded materials for this course yet."
-        />
-      ) : (
-        <div className="row">
-          {state.materials.map((m) => <MaterialCard key={m.id} material={m} />)}
-        </div>
-      )}
+     
     </Layout>
   )
 }

@@ -1,6 +1,4 @@
 const asyncHandler = require("express-async-handler");
-const fs = require("fs");
-const path = require("path");
 const Course = require("../models/Course");
 const Trainer = require("../models/Trainer");
 const Student = require("../models/Student");
@@ -60,7 +58,8 @@ const getCourseById = asyncHandler(async (req, res) => {
 // @route   POST /api/courses
 // @access  Private (trainer only)
 const createCourse = asyncHandler(async (req, res) => {
-  const { name, description, technologies, roadmap, duration, fees, image } =
+  // ADDED: code
+  const { name, description, technologies, roadmap, duration, fees, image, code } =
     req.body;
 
   if (!name || !duration || fees === undefined) {
@@ -72,24 +71,11 @@ const createCourse = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Trainer profile not found for this account");
   }
 
-  // CHANGED: req.file -> req.files, since the route now uses .fields([...])
-  // to accept both "image" and "file" in one request.
-  const uploadedImage = req.files?.image?.[0];
-  const uploadedFile = req.files?.file?.[0];
-
-  // ADDED: prefer the uploaded image file's path over a plain `image` body
-  // field (kept `image` from req.body as a fallback in case some callers
-  // still send it as a plain string/URL instead of a file).
+  // ADDED: image upload via multer's upload.single("image") -> req.file
+  const uploadedImage = req.file;
   const imagePath = uploadedImage
     ? `/uploads/courses/${uploadedImage.filename}`
     : image;
-
-  // ADDED: PDF/video course file path.
-  // ASSUMPTION: Course model has a `fileUrl` String field — please confirm
-  // by sharing Course.js, otherwise Mongoose will silently drop this field.
-  const fileUrl = uploadedFile
-    ? `/uploads/courses/${uploadedFile.filename}`
-    : undefined;
 
   const course = await Course.create({
     name,
@@ -99,7 +85,7 @@ const createCourse = asyncHandler(async (req, res) => {
     duration,
     fees,
     image: imagePath,
-    fileUrl, // ADDED
+    code, // ADDED
     trainerId: trainer._id,
     status: "active",
   });
@@ -143,28 +129,17 @@ const updateCourse = asyncHandler(async (req, res) => {
     "duration",
     "fees",
     "image",
+    "code", // ADDED
     "status",
   ];
   updatableFields.forEach((field) => {
     if (req.body[field] !== undefined) course[field] = req.body[field];
   });
 
-  // CHANGED: req.file -> req.files (route now uses .fields([...])).
-  const uploadedImage = req.files?.image?.[0];
-  const uploadedFile = req.files?.file?.[0];
-
+  // ADDED: image upload via multer's upload.single("image") -> req.file
+  const uploadedImage = req.file;
   if (uploadedImage) {
     course.image = `/uploads/courses/${uploadedImage.filename}`;
-  }
-
-  // ADDED: replace the course's PDF/video, deleting the old one from disk
-  // first (same pattern as updateMaterial in materialController.js).
-  if (uploadedFile) {
-    if (course.fileUrl) {
-      const oldPath = path.join(__dirname, "..", course.fileUrl);
-      fs.unlink(oldPath, () => {});
-    }
-    course.fileUrl = `/uploads/courses/${uploadedFile.filename}`;
   }
 
   await course.save();

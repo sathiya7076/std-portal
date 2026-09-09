@@ -41,6 +41,24 @@ const extractData = (payload) => {
   return payload
 }
 
+// FIXED: if the caller already built a FormData object (e.g. TrainerCourses.jsx
+// does this itself when handling the image file), use it directly instead of
+// trying to destructure it — destructuring a FormData instance silently drops
+// all its fields, which was causing "Name, duration, and fees are required".
+const buildCoursePayload = (payload) => {
+  if (payload instanceof FormData) return payload
+
+  const { imageFile, ...rest } = payload
+  if (!imageFile) return rest
+
+  const formData = new FormData()
+  Object.entries(rest).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) formData.append(key, value)
+  })
+  formData.append('image', imageFile)
+  return formData
+}
+
 const courseService = {
   async getAllCourses() {
     if (USE_MOCK) return mockDelay([...mockCourses])
@@ -56,26 +74,36 @@ const courseService = {
 
   async createCourse(payload) {
     if (USE_MOCK) {
+      const { imageFile, ...rest } = payload instanceof FormData ? {} : payload
       const newCourse = {
-        students: 0, // no students enrolled yet
-        ...payload,
-        id: payload.id || `c${Date.now()}`,
+        students: 0,
+        ...rest,
+        image: imageFile ? URL.createObjectURL(imageFile) : rest.image,
+        id: rest.id || `c${Date.now()}`,
       }
       mockCourses.push(newCourse)
-      saveCourses(mockCourses) // 👈 persist immediately
+      saveCourses(mockCourses)
       return mockDelay(newCourse, 700)
     }
-    const { data } = await api.post('/courses', payload)
+    const body = buildCoursePayload(payload)
+    const { data } = await api.post('/courses', body, body instanceof FormData
+      ? { headers: { 'Content-Type': 'multipart/form-data' } }
+      : undefined)
     return extractData(data)
   },
 
   async updateCourse(id, payload) {
     if (USE_MOCK) {
-      mockCourses = mockCourses.map((c) => (c.id === id ? { ...c, ...payload } : c))
+      const { imageFile, ...rest } = payload instanceof FormData ? {} : payload
+      const patch = imageFile ? { ...rest, image: URL.createObjectURL(imageFile) } : rest
+      mockCourses = mockCourses.map((c) => (c.id === id ? { ...c, ...patch } : c))
       saveCourses(mockCourses)
       return mockDelay(mockCourses.find((c) => c.id === id), 600)
     }
-    const { data } = await api.put(`/courses/${id}`, payload)
+    const body = buildCoursePayload(payload)
+    const { data } = await api.put(`/courses/${id}`, body, body instanceof FormData
+      ? { headers: { 'Content-Type': 'multipart/form-data' } }
+      : undefined)
     return extractData(data)
   },
 

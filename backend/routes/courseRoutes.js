@@ -12,11 +12,10 @@ const { requireRole } = require("../middleware/roleMiddleware");
 
 const router = express.Router();
 
-// Adjust destination/filename/limits to match how your other upload
-// routes (if any) are already configured, so behavior stays consistent.
+// Adjust destination/limits to match your other upload routes if any exist.
 const upload = multer({
-  dest: "uploads/courses/", // or your existing shared uploads dir
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB, adjust as needed
+  dest: "uploads/courses/",
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
 });
 
 router.use(protect);
