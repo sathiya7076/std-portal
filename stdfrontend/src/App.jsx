@@ -27,7 +27,7 @@ import TrainerCourses from './pages/trainer/TrainerCourses'
 import TrainerTasks from './pages/trainer/TrainerTasks'
 import TrainerMaterials from './pages/trainer/TrainerMaterials'
 import TrainerProfile from './pages/trainer/TrainerProfile'
-
+import CourseList from './pages/trainer/Courselist'
 export default function App() {
   return (
     <Routes>
@@ -55,6 +55,7 @@ export default function App() {
       <Route path="/trainer/students/add" element={<ProtectedRoute role="trainer"><AddStudent /></ProtectedRoute>} />
       <Route path="/trainer/students/:id" element={<ProtectedRoute role="trainer"><TrainerStudentDetail /></ProtectedRoute>} />
       <Route path="/trainer/courses" element={<ProtectedRoute role="trainer"><TrainerCourses /></ProtectedRoute>} />
+      <Route path="/trainer/courses/list" element={<ProtectedRoute role="trainer"><CourseList /></ProtectedRoute>} /> {/* ADDED */}
       <Route path="/trainer/tasks" element={<ProtectedRoute role="trainer"><TrainerTasks /></ProtectedRoute>} />
       <Route path="/trainer/materials" element={<ProtectedRoute role="trainer"><TrainerMaterials /></ProtectedRoute>} />
       <Route path="/trainer/profile" element={<ProtectedRoute role="trainer"><TrainerProfile /></ProtectedRoute>} />

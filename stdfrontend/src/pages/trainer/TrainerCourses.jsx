@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom"; // ADDED
 import courseService from "../../services/courseService";
 import notificationService from "../../services/notificationService";
 
@@ -19,6 +20,7 @@ const TrainerCourses = () => {
   const [imageFile, setImageFile] = useState(null);
   const [errors, setErrors] = useState([]);
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate(); // ADDED
 
   useEffect(() => {
     fetchCourses();
@@ -296,48 +298,18 @@ const TrainerCourses = () => {
         </form>
       </div>
 
-      <table border="1" cellPadding="8" className="tc-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr>
-            <th>Name</th>
-            
-            <th>Duration</th>
-            <th>Fees</th>
-            <th>Status</th>
-            <th>Image</th>
-          </tr>
-        </thead>
-        <tbody>
-          {courses.length === 0 ? (
-            <tr>
-              <td colSpan="6" style={{ textAlign: "center" }}>
-                No courses yet.
-              </td>
-            </tr>
-          ) : (
-            courses.map((course) => (
-              <tr key={course._id || course.id}>
-                <td style={{ margin: '100px' }}>{course.name}</td>
-                
-                <td>{course.duration} </td>
-                <td>{course.fees}</td>
-                <td>{course.status}</td>
-                <td>
-                  {course.image ? (
-                    <img
-                      src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}${course.image}`}
-                      alt={course.name}
-                      width="60"
-                    />
-                  ) : (
-                    "—"
-                  )}
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+      {/* ADDED: View Course button — navigates to a separate course-list page */}
+      <div style={{ textAlign: "center", margin: "1rem 0" }}>
+        <button
+          type="button"
+          className="tc-submit-btn"
+          onClick={() => navigate("/trainer/courses/list")}
+        >
+          View Course
+        </button>
+      </div>
+
+     
     </div>
   );
 };
