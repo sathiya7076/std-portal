@@ -68,8 +68,35 @@ export default function TrainerDashboard() {
       try {
         if (typeof studentService.getTodayAttendanceMap !== 'function') return
         const data = await studentService.getTodayAttendanceMap()
-        if (!cancelled) setTodayAttendance(data || {})
-      } catch {
+
+        // FIX: the endpoint may return either an object already keyed by
+        // student id, OR a plain array of attendance records. Normalize
+        // both shapes into a single { [id]: record } lookup so the rest
+        // of the component doesn't have to care which one comes back.
+        let normalized = {}
+        if (Array.isArray(data)) {
+          data.forEach((record) => {
+            // FIX: try every id field we've seen used for this across the
+            // codebase (studentId, _id, student, studentId as populated ref).
+            const key =
+              record.studentId ??
+              record._id ??
+              record.student?._id ??
+              record.student
+            if (key) normalized[key] = record
+          })
+        } else if (data && typeof data === 'object') {
+          normalized = data
+        }
+
+        // TEMP DEBUG: remove once attendance shows correctly.
+        // Open the browser console and check this log — it tells you
+        // exactly what shape the backend is sending and what keys exist.
+        console.log('[TrainerDashboard] attendance map (normalized):', normalized)
+
+        if (!cancelled) setTodayAttendance(normalized)
+      } catch (err) {
+        console.error('[TrainerDashboard] failed to load attendance map:', err)
         if (!cancelled) setTodayAttendance({})
       }
     }
@@ -77,16 +104,25 @@ export default function TrainerDashboard() {
     return () => { cancelled = true }
   }, [state.students])
 
-  // FIX: check both studentId and _id as the map key, since we don't
-  // yet know for certain which one the backend attendance record uses.
-  const getAttendanceRecord = (s) => todayAttendance[s.studentId] ?? todayAttendance[s._id]
+  // FIX: check studentId, _id, and string-cast versions of both, since we
+  // don't yet know for certain which one the backend attendance record
+  // uses as its key (Mongo ObjectIds vs strings can mismatch here).
+  const getAttendanceRecord = (s) =>
+    todayAttendance[s.studentId] ??
+    todayAttendance[s._id] ??
+    todayAttendance[String(s.studentId)] ??
+    todayAttendance[String(s._id)]
 
   const renderAttendanceBadge = (s) => {
     const record = getAttendanceRecord(s)
-    if (!record || !record.status) {
+    // FIX: some backends call this field attendanceStatus / present
+    // instead of status — check the common alternatives before giving up.
+    const status = record?.status ?? record?.attendanceStatus ?? (record?.present === true ? 'present' : record?.present === false ? 'absent' : undefined)
+
+    if (!record || !status) {
       return <span className="badge bg-secondary">Not marked</span>
     }
-    if (record.status === 'present') {
+    if (status === 'present') {
       return <span className="badge bg-success">Present today</span>
     }
     return <span className="badge bg-danger">Absent today</span>
@@ -96,9 +132,7 @@ export default function TrainerDashboard() {
     <Layout breadcrumb={['Trainer', 'Dashboard']}>
       <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
         <h4 className="font-display fw-bold mb-0">Student Progress</h4>
-        <Link to="/trainer/students/register" className="btn btn-primary btn-sm">
-          <i className="bi bi-person-plus me-1"></i>Register Student
-        </Link>
+      
       </div>
 
       <div className="d-flex gap-2 flex-wrap mb-4">

@@ -7,6 +7,7 @@ export default function StudentRegister() {
   const { user } = useAuth()
   const [marking, setMarking] = useState(false)
   const [marked, setMarked] = useState(false)
+  const [markedStatus, setMarkedStatus] = useState(null) // NEW: 'present' | 'late' | 'absent'
   const [details, setDetails] = useState(null)
   const [loadingDetails, setLoadingDetails] = useState(false)
   const [error, setError] = useState(null)
@@ -41,8 +42,11 @@ export default function StudentRegister() {
     setMarking(true)
     setError(null)
     try {
-      await studentService.markMyAttendance() // POST /api/attendance/checkin — add if missing from studentService.js
+      // NEW: backend now returns the computed status (present/late/absent)
+      // based on check-in time — response.data.status
+      const response = await studentService.markMyAttendance() // POST /api/attendance/checkin
       setMarked(true)
+      setMarkedStatus(response?.data?.status ?? response?.status ?? 'present') // NEW
       await loadDetails()
     } catch (e) {
       const message = e?.response?.data?.message
@@ -53,6 +57,29 @@ export default function StudentRegister() {
     } finally {
       setMarking(false)
     }
+  }
+
+  // NEW: helper to render the right label/icon/color for the computed status
+  const renderMarkedLabel = () => {
+    if (markedStatus === 'late') {
+      return (
+        <span className="text-warning">
+          <i className="bi bi-exclamation-circle me-1"></i>Marked Late
+        </span>
+      )
+    }
+    if (markedStatus === 'absent') {
+      return (
+        <span className="text-danger">
+          <i className="bi bi-x-circle me-1"></i>Marked Absent
+        </span>
+      )
+    }
+    return (
+      <span className="text-success">
+        <i className="bi bi-check-circle me-1"></i>Marked Present
+      </span>
+    )
   }
 
   return (
@@ -74,7 +101,7 @@ export default function StudentRegister() {
               {marking ? (
                 <><span className="spinner-border spinner-border-sm me-2"></span>Marking...</>
               ) : marked ? (
-                <><i className="bi bi-check-circle me-1"></i>Marked Present</>
+                renderMarkedLabel() // NEW: was hardcoded "Marked Present"
               ) : (
                 'Mark My Attendance'
               )}

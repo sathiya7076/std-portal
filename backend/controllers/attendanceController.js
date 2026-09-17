@@ -7,6 +7,51 @@ const { getPagination, buildMeta } = require("../utils/paginate");
 const { getStudentAttendanceSummary } = require("../services/attendanceService");
 const { createNotification } = require("../services/notificationService");
 
+// ─── NEW: helper to decide attendance status from check-in time ───
+// Rules:
+//   before 09:30         -> "present"
+//   09:30 - 10:30         -> "late"
+//   after 10:30           -> "absent"
+// FIXED: now computed against IST explicitly (UTC+5:30) instead of
+// now.getHours()/getMinutes(), which reads the SERVER's local timezone.
+// If the server isn't already running in Asia/Kolkata, the original
+// version would evaluate check-in times against the wrong clock.
+function computeAttendanceStatus(now) {
+  const istOffsetMinutes = 5 * 60 + 30;
+  const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const istMinutes = (utcMinutes + istOffsetMinutes) % (24 * 60);
+
+  const PRESENT_CUTOFF = 9 * 60 + 30;  // 9:30 AM IST
+  const LATE_CUTOFF = 10 * 60 + 30;    // 10:30 AM IST
+
+  if (istMinutes < PRESENT_CUTOFF) {
+    return "present";
+  } else if (istMinutes <= LATE_CUTOFF) {
+    return "late";
+  } else {
+    return "absent";
+  }
+}
+
+// ─── NEW: helper for the duplicate-checkin guard below ───
+// Returns the UTC-millisecond boundaries of "today" in IST, so we can
+// query for any existing attendance record within that window —
+// independent of whatever precision/index the Attendance schema uses
+// on `date`.
+function getISTDayBoundsUTC(now) {
+  const istOffsetMs = (5 * 60 + 30) * 60 * 1000;
+  const istNow = new Date(now.getTime() + istOffsetMs);
+  const istMidnight = new Date(Date.UTC(
+    istNow.getUTCFullYear(),
+    istNow.getUTCMonth(),
+    istNow.getUTCDate()
+  ));
+  const startUTC = new Date(istMidnight.getTime() - istOffsetMs);
+  const endUTC = new Date(startUTC.getTime() + 24 * 60 * 60 * 1000);
+  return { startUTC, endUTC };
+}
+// ─────────────────────────────────────────────────────────────────
+
 // @desc    Mark attendance for a student
 // @route   POST /api/attendance
 // @access  Private (trainer only)
@@ -85,12 +130,29 @@ const markMyAttendance = asyncHandler(async (req, res) => {
 
   const now = new Date();
 
+  // ─── NEW: application-level guard for duplicate same-day check-in.
+  // Runs BEFORE create(), in addition to (not replacing) the existing
+  // error.code === 11000 catch below — that catch only fires if the
+  // schema's unique index is on a date truncated to day; this guard
+  // works regardless of how the index is defined.
+  const { startUTC, endUTC } = getISTDayBoundsUTC(now);
+  const existing = await Attendance.findOne({
+    studentId: student._id,
+    date: { $gte: startUTC, $lt: endUTC },
+  });
+  if (existing) {
+    throw new ApiError(409, "Attendance already recorded for today");
+  }
+
+  // ─── NEW: compute status based on check-in time instead of hardcoding "present" ───
+  const computedStatus = computeAttendanceStatus(now);
+
   let attendance;
   try {
     attendance = await Attendance.create({
       studentId: student._id,
       date: now,
-      status: "present",
+      status: computedStatus, // was: status: "present"
       checkInTime: now,
     });
   } catch (error) {
@@ -100,11 +162,31 @@ const markMyAttendance = asyncHandler(async (req, res) => {
     throw error;
   }
 
+  // ─── NEW: notification message/title now reflects the computed status ───
+  const notificationConfig = {
+    present: {
+      title: "Attendance Marked Present",
+      message: `Your attendance was marked present on ${now.toDateString()}.`,
+      type: "attendance",
+    },
+    late: {
+      title: "Late Arrival",
+      message: `You checked in late on ${now.toDateString()}.`,
+      type: "late",
+    },
+    absent: {
+      title: "Attendance Marked Absent",
+      message: `Your check-in on ${now.toDateString()} was too late and was recorded as absent.`,
+      type: "attendance",
+    },
+  };
+  const { title, message, type } = notificationConfig[computedStatus];
+
   await createNotification({
     userId: req.user._id,
-    type: "attendance",
-    title: "Attendance Marked Present",
-    message: `Your attendance was marked present on ${now.toDateString()}.`,
+    type,
+    title,
+    message,
     relatedId: attendance._id,
   });
 
