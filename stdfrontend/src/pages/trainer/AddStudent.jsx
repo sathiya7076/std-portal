@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom' // NEW: for the "View Student" button
 import Layout from '../../components/Layout'
 import studentService from '../../services/studentService'
 import authService from '../../services/authService'
@@ -160,6 +161,7 @@ export default function AddStudent() {
     const selectedCourse = courses.find((c) => c._id === form.course)
     const submittedForm = { ...form }
     const registeredData = {
+      mongoId: profile._id, // NEW: needed to link to /trainer/students/:id
       studentId: profile.studentId,
       name: submittedForm.name,
       email: submittedForm.email,
@@ -210,8 +212,21 @@ export default function AddStudent() {
 
       {success && registeredProfile && (
         <div className="alert alert-success py-2 small">
-          <div className="fw-semibold mb-2">
-            <i className="bi bi-check-circle me-2"></i>Student registered successfully!
+          <div className="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+            <div className="fw-semibold">
+              <i className="bi bi-check-circle me-2"></i>Student registered successfully!
+            </div>
+            {/* NEW: View Student button — navigates to the existing
+                /trainer/students/:id route (TrainerStudentDetail) using
+                the Mongo _id captured above. */}
+            {registeredProfile.mongoId && (
+              <Link
+                to={`/trainer/students/${registeredProfile.mongoId}`}
+                className="btn btn-outline-success btn-sm"
+              >
+                <i className="bi bi-eye me-1"></i>View Student
+              </Link>
+            )}
           </div>
           <div className="row row-cols-2 row-cols-md-3 g-1 mb-0">
             <div><span className="text-muted">Student ID:</span> <strong>{registeredProfile.studentId}</strong></div>

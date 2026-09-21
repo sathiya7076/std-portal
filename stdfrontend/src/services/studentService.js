@@ -267,19 +267,40 @@ const studentService = {
         const recordDate = r.date ?? r.attendanceDate ?? r.createdAt
         if (!recordDate || new Date(recordDate).toDateString() !== todayStr) return
 
-        // Resolve which student this record belongs to — could be a
-        // populated object, a raw ObjectId, or a human-readable code.
+        // FIXED: getAttendanceRecords on the backend does
+        // .populate("studentId", "studentId"), so r.studentId comes back
+        // as a POPULATED OBJECT ({ _id, studentId: "STU-..." }), not a
+        // plain string/ObjectId. The old code did `r.studentId ?? ...`,
+        // which is truthy for an object and short-circuited here —
+        // meaning studentKey was being set to the whole object, then
+        // silently stringified to "[object Object]" as a property key.
+        // Every record collapsed onto that one bad key, so
+        // TrainerDashboard's per-student lookups never matched anything.
+        // Now we explicitly unwrap the populated object first.
+        const populatedStudentId =
+          typeof r.studentId === 'object' && r.studentId !== null
+            ? (r.studentId.studentId ?? r.studentId._id)
+            : r.studentId
+
         const studentKey =
-          r.studentId ??
+          populatedStudentId ??
           (typeof r.student === 'object' ? (r.student?._id ?? r.student?.studentId) : r.student) ??
           r.student_id
 
         if (!studentKey) return
 
+        // FIXED: also keep the raw Mongo _id as a second key into the same
+        // record, since TrainerDashboard's getAttendanceRecord() looks up
+        // by both s.studentId (human code) and s._id (Mongo id) — the
+        // populated object gives us both, so store under both when available.
+        const mongoId = typeof r.studentId === 'object' ? r.studentId?._id : undefined
+
         const status =
           r.status ?? (r.present === true ? 'present' : r.present === false ? 'absent' : undefined)
 
-        map[studentKey] = { status, currentActivity: r.currentActivity ?? r.activity ?? null }
+        const record = { status, currentActivity: r.currentActivity ?? r.activity ?? null }
+        map[studentKey] = record
+        if (mongoId && mongoId !== studentKey) map[mongoId] = record
       })
       return map
     } catch (err) {

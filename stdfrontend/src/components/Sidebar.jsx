@@ -30,13 +30,14 @@ export default function Sidebar({ open, onClose }) {
     <>
       {open && <div className="sidebar-backdrop d-lg-none" onClick={onClose}></div>}
       <aside className={`stms-sidebar ${open ? 'open' : ''}`}>
-        <div className="brand d-flex align-items-center gap-2">
+
+       <a className='heading' href="http://localhost:5173/login"><div className="brand d-flex align-items-center gap-2">
           <span className="brand-mark">S</span>
           <div>
             <div className="brand-title">Smart Training</div>
             <div className="brand-sub">Management System</div>
           </div>
-        </div>
+        </div></a> 
         <nav className="stms-nav">
           {links.map((link) => (
             <NavLink

@@ -122,8 +122,15 @@ export default function TrainerDashboard() {
     if (!record || !status) {
       return <span className="badge bg-secondary">Not marked</span>
     }
+    // FIXED: "late" was previously falling into the default/absent branch
+    // below, mislabeling late check-ins as "Absent today". Now handled
+    // as its own state, matching the present/late/absent values the
+    // backend's computeAttendanceStatus() can actually return.
     if (status === 'present') {
       return <span className="badge bg-success">Present today</span>
+    }
+    if (status === 'late') {
+      return <span className="badge bg-warning text-dark">Late today</span>
     }
     return <span className="badge bg-danger">Absent today</span>
   }

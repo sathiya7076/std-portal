@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Layout from "../../components/Layout"; // ADDED
 import courseService from "../../services/courseService";
 
 const CourseList = () => {
@@ -84,141 +85,143 @@ const CourseList = () => {
   };
 
   return (
-    <div style={{ padding: "1rem" }}>
-      <h2 style={{ marginBottom: "1rem" }}>All Courses</h2>
+    <Layout breadcrumb={['Trainer', 'Courses']}> {/* ADDED: wraps page with sidebar/layout */}
+      <div style={{ padding: "1rem" }}>
+        <h2 style={{ marginBottom: "1rem" }}>All Courses</h2>
 
-      {loading ? (
-        <p>Loading courses...</p>
-      ) : (
-        <table border="1" cellPadding="8" style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Duration</th>
-              <th>Fees</th>
-              <th>Status</th>
-              <th>Image</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {courses.length === 0 ? (
+        {loading ? (
+          <p>Loading courses...</p>
+        ) : (
+          <table border="1" cellPadding="8" style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
               <tr>
-                <td colSpan="6" style={{ textAlign: "center" }}>
-                  No courses yet.
-                </td>
+                <th>Name</th>
+                <th>Duration</th>
+                <th>Fees</th>
+                <th>Status</th>
+                <th>Image</th>
+                <th>Actions</th>
               </tr>
-            ) : (
-              courses.map((course) => {
-                const courseId = course._id || course.id;
-                const isEditing = editingId === courseId;
+            </thead>
+            <tbody>
+              {courses.length === 0 ? (
+                <tr>
+                  <td colSpan="6" style={{ textAlign: "center" }}>
+                    No courses yet.
+                  </td>
+                </tr>
+              ) : (
+                courses.map((course) => {
+                  const courseId = course._id || course.id;
+                  const isEditing = editingId === courseId;
 
-                return (
-                  <tr key={courseId}>
-                    <td>
-                      {isEditing ? (
-                        <input
-                          name="name"
-                          value={editFormData.name}
-                          onChange={handleEditChange}
-                        />
-                      ) : (
-                        course.name
-                      )}
-                    </td>
-                    <td>
-                      {isEditing ? (
-                        <input
-                          name="duration"
-                          value={editFormData.duration}
-                          onChange={handleEditChange}
-                        />
-                      ) : (
-                        course.duration
-                      )}
-                    </td>
-                    <td>
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          name="fees"
-                          value={editFormData.fees}
-                          onChange={handleEditChange}
-                          min="0"
-                        />
-                      ) : (
-                        course.fees
-                      )}
-                    </td>
-                    <td>
-                      {isEditing ? (
-                        <select
-                          name="status"
-                          value={editFormData.status}
-                          onChange={handleEditChange}
-                        >
-                          <option value="active">Active</option>
-                          <option value="inactive">Inactive</option>
-                          <option value="archived">Archived</option>
-                        </select>
-                      ) : (
-                        course.status
-                      )}
-                    </td>
-                    <td>
-                      {course.image ? (
-                        <img
-                          src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}${course.image}`}
-                          alt={course.name}
-                          width="60"
-                        />
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    {/* ADDED: Actions column with Edit/Delete (or Save/Cancel while editing) */}
-                    <td>
-                      {isEditing ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => handleEditSave(courseId)}
-                            disabled={savingEdit}
-                            style={{ marginRight: "6px" }}
+                  return (
+                    <tr key={courseId}>
+                      <td>
+                        {isEditing ? (
+                          <input
+                            name="name"
+                            value={editFormData.name}
+                            onChange={handleEditChange}
+                          />
+                        ) : (
+                          course.name
+                        )}
+                      </td>
+                      <td>
+                        {isEditing ? (
+                          <input
+                            name="duration"
+                            value={editFormData.duration}
+                            onChange={handleEditChange}
+                          />
+                        ) : (
+                          course.duration
+                        )}
+                      </td>
+                      <td>
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            name="fees"
+                            value={editFormData.fees}
+                            onChange={handleEditChange}
+                            min="0"
+                          />
+                        ) : (
+                          course.fees
+                        )}
+                      </td>
+                      <td>
+                        {isEditing ? (
+                          <select
+                            name="status"
+                            value={editFormData.status}
+                            onChange={handleEditChange}
                           >
-                            {savingEdit ? "Saving..." : "Save"}
-                          </button>
-                          <button type="button" onClick={handleEditCancel}>
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => handleEditClick(course)}
-                            style={{ marginRight: "6px" }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(courseId)}
-                            disabled={deletingId === courseId}
-                          >
-                            {deletingId === courseId ? "Deleting..." : "Delete"}
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      )}
-    </div>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="archived">Archived</option>
+                          </select>
+                        ) : (
+                          course.status
+                        )}
+                      </td>
+                      <td>
+                        {course.image ? (
+                          <img
+                            src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}${course.image}`}
+                            alt={course.name}
+                            width="60"
+                          />
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      {/* ADDED: Actions column with Edit/Delete (or Save/Cancel while editing) */}
+                      <td>
+                        {isEditing ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleEditSave(courseId)}
+                              disabled={savingEdit}
+                              style={{ marginRight: "6px" }}
+                            >
+                              {savingEdit ? "Saving..." : "Save"}
+                            </button>
+                            <button type="button" onClick={handleEditCancel}>
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleEditClick(course)}
+                              style={{ marginRight: "6px" }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(courseId)}
+                              disabled={deletingId === courseId}
+                            >
+                              {deletingId === courseId ? "Deleting..." : "Delete"}
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </Layout>
   );
 };
 
