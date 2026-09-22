@@ -22,16 +22,33 @@ const feeRoutes = require("./routes/feeRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 
+// Kick off the DB connection. Don't block module load on it — mongoose
+// buffers queries by default until the connection is ready, and on
+// serverless we want route registration (below) to always succeed even
+// if the DB is briefly unreachable, rather than crashing the whole
+// function the way the old courseRoutes.js bug did.
 connectDB();
 
 const app = express();
 
 // Core middleware
+// NOTE: origin: "*" combined with credentials: true is an invalid CORS
+// combination — browsers will reject it. Since this API authenticates
+// via a Bearer token (Authorization header, see authMiddleware.js) and
+// not cookies, credentials aren't actually required. If CLIENT_URL is
+// set, we reflect it and allow credentials; otherwise we fall back to
+// an open, credential-less CORS policy.
+const allowedOrigins = (process.env.CLIENT_URL || "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 app.use(
-  cors({
-    origin: process.env.CLIENT_URL || "*",
-    credentials: true,
-  })
+  cors(
+    allowedOrigins.length > 0
+      ? { origin: allowedOrigins, credentials: true }
+      : { origin: "*", credentials: false }
+  )
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -66,8 +83,17 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV || "development"} mode on port ${PORT}`);
-});
+// Only bind a port when this file is actually run directly (local dev /
+// a traditional Node host). On Vercel, the platform imports `app` and
+// routes requests to it itself — calling listen() there serves no
+// purpose and can log misleading "listening" messages on every cold
+// start.
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(
+      `Server running in ${process.env.NODE_ENV || "development"} mode on port ${PORT}`
+    );
+  });
+}
 
 module.exports = app;
