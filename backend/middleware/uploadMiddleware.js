@@ -54,23 +54,12 @@ const buildStorage = (subfolder) => {
 };
 
 const materialFileFilter = (req, file, cb) => {
-  // TEMP DEBUG LOGGING — remove once the 400 is resolved.
-  console.log(
-    "[materialFileFilter] fieldname:", file.fieldname,
-    "| originalname:", file.originalname,
-    "| mimetype:", file.mimetype
-  );
-
   const ext = path.extname(file.originalname).toLowerCase();
   const isKnownMime = MATERIAL_ALLOWED_MIME.has(file.mimetype);
   const isOctetStreamPdf =
     file.mimetype === "application/octet-stream" && ext === ".pdf";
 
   if (!isKnownMime && !isOctetStreamPdf) {
-    console.log(
-      "[materialFileFilter] REJECTED — mimetype not in allowed set:",
-      file.mimetype
-    );
     return cb(
       new ApiError(
         400,
@@ -104,4 +93,29 @@ const uploadSubmission = multer({
   limits: { fileSize: MAX_SUBMISSION_FILE_SIZE },
 });
 
-module.exports = { uploadMaterial, uploadSubmission };
+const COURSE_IMAGE_ALLOWED_MIME = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+]);
+
+const MAX_COURSE_IMAGE_SIZE =
+  parseInt(process.env.MAX_COURSE_IMAGE_SIZE, 10) || 5 * 1024 * 1024; // 5MB
+
+const courseImageFileFilter = (req, file, cb) => {
+  if (!COURSE_IMAGE_ALLOWED_MIME.has(file.mimetype)) {
+    return cb(
+      new ApiError(400, "Only PNG, JPEG, and WEBP images are allowed for course images"),
+      false
+    );
+  }
+  cb(null, true);
+};
+
+const uploadCourseImage = multer({
+  storage: buildStorage("courses"),
+  fileFilter: courseImageFileFilter,
+  limits: { fileSize: MAX_COURSE_IMAGE_SIZE },
+});
+
+module.exports = { uploadMaterial, uploadSubmission, uploadCourseImage };
