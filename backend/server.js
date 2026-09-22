@@ -22,34 +22,46 @@ const feeRoutes = require("./routes/feeRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 
-// Kick off the DB connection. Don't block module load on it — mongoose
-// buffers queries by default until the connection is ready, and on
-// serverless we want route registration (below) to always succeed even
-// if the DB is briefly unreachable, rather than crashing the whole
-// function the way the old courseRoutes.js bug did.
-connectDB();
+// IMPORTANT: connectDB() now rejects instead of calling process.exit() on
+// failure (see config/db.js). A bare `connectDB();` here would leave that
+// rejection unhandled — and on Node 15+, an unhandled promise rejection
+// crashes the whole process by default, producing the exact same
+// "Node.js process exited with exit status: 1" symptom we were trying to
+// eliminate. The .catch() below is what actually prevents that.
+connectDB().catch((err) => {
+  console.error("Failed to connect to MongoDB on startup:", err.message);
+});
 
 const app = express();
 
-// Core middleware
-// NOTE: origin: "*" combined with credentials: true is an invalid CORS
-// combination — browsers will reject it. Since this API authenticates
-// via a Bearer token (Authorization header, see authMiddleware.js) and
-// not cookies, credentials aren't actually required. If CLIENT_URL is
-// set, we reflect it and allow credentials; otherwise we fall back to
-// an open, credential-less CORS policy.
-const allowedOrigins = (process.env.CLIENT_URL || "")
+// --- CORS ---
+// Production origins come from CLIENT_URL (comma-separated list, e.g.
+// "https://std-portal.vercel.app,https://myapp.com"). Localhost on any
+// port is ALWAYS allowed, regardless of what CLIENT_URL is set to, so
+// local dev (Vite on :5173, etc.) can hit this deployed backend without
+// needing localhost added to a Vercel env var. Auth uses a Bearer token
+// (see authMiddleware.js), not cookies, so credentials: true isn't needed.
+const configuredOrigins = (process.env.CLIENT_URL || "")
   .split(",")
   .map((o) => o.trim())
   .filter(Boolean);
 
+const isLocalhost = (origin) =>
+  /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+
 app.use(
-  cors(
-    allowedOrigins.length > 0
-      ? { origin: allowedOrigins, credentials: true }
-      : { origin: "*", credentials: false }
-  )
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true); // curl/Postman/server-to-server
+      if (isLocalhost(origin)) return callback(null, true);
+      if (configuredOrigins.length === 0) return callback(null, true);
+      if (configuredOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error(`CORS: origin '${origin}' is not allowed`));
+    },
+    credentials: false,
+  })
 );
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
@@ -64,9 +76,9 @@ app.get("/api/health", (req, res) => {
 
 // Mounted routes
 app.use("/api/auth", authRoutes);
-app.use("/api/students", studentRoutes); // plural: trainer-facing CRUD
-app.use("/api/student", studentSelfRoutes); // singular: self-service profile/dashboard
-app.use("/api/trainer", trainerRoutes); // singular: self-service profile/dashboard
+app.use("/api/students", studentRoutes);
+app.use("/api/student", studentSelfRoutes);
+app.use("/api/trainer", trainerRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/fingerprint", fingerprintRoutes);
@@ -83,11 +95,6 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-// Only bind a port when this file is actually run directly (local dev /
-// a traditional Node host). On Vercel, the platform imports `app` and
-// routes requests to it itself — calling listen() there serves no
-// purpose and can log misleading "listening" messages on every cold
-// start.
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(

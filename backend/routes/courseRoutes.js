@@ -14,10 +14,10 @@ const router = express.Router();
 
 router.use(protect);
 
-router.get("/", getCourses); // both roles
+router.get("/", getCourses);
 router.post("/", requireRole("trainer"), uploadCourseImage.single("image"), createCourse);
 
-router.get("/:id", getCourseById); // both roles
+router.get("/:id", getCourseById);
 router.put("/:id", requireRole("trainer"), uploadCourseImage.single("image"), updateCourse);
 router.delete("/:id", requireRole("trainer"), deleteCourse);
 

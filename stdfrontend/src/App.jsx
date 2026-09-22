@@ -15,7 +15,6 @@ import MaterialsByCourse from './pages/student/MaterialsByCourse'
 import StudentTasks from './pages/student/StudentTasks'
 import TaskDetails from './pages/student/TaskDetails'
 import StudentFees from './pages/student/StudentFees'
-import PaymentModal from './pages/student/Paymentmodel'
 import StudentProfile from './pages/student/StudentProfile'
 import StudentNotifications from './pages/student/StudentNotifications'
 
@@ -28,6 +27,7 @@ import TrainerTasks from './pages/trainer/TrainerTasks'
 import TrainerMaterials from './pages/trainer/TrainerMaterials'
 import TrainerProfile from './pages/trainer/TrainerProfile'
 import CourseList from './pages/trainer/Courselist'
+
 export default function App() {
   return (
     <Routes>
@@ -55,7 +55,7 @@ export default function App() {
       <Route path="/trainer/students/add" element={<ProtectedRoute role="trainer"><AddStudent /></ProtectedRoute>} />
       <Route path="/trainer/students/:id" element={<ProtectedRoute role="trainer"><TrainerStudentDetail /></ProtectedRoute>} />
       <Route path="/trainer/courses" element={<ProtectedRoute role="trainer"><TrainerCourses /></ProtectedRoute>} />
-      <Route path="/trainer/courses/list" element={<ProtectedRoute role="trainer"><CourseList /></ProtectedRoute>} /> {/* ADDED */}
+      <Route path="/trainer/courses/list" element={<ProtectedRoute role="trainer"><CourseList /></ProtectedRoute>} />
       <Route path="/trainer/tasks" element={<ProtectedRoute role="trainer"><TrainerTasks /></ProtectedRoute>} />
       <Route path="/trainer/materials" element={<ProtectedRoute role="trainer"><TrainerMaterials /></ProtectedRoute>} />
       <Route path="/trainer/profile" element={<ProtectedRoute role="trainer"><TrainerProfile /></ProtectedRoute>} />
