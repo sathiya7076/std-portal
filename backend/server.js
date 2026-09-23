@@ -41,7 +41,7 @@ const app = express();
 // local dev (Vite on :5173, etc.) can hit this deployed backend without
 // needing localhost added to a Vercel env var. Auth uses a Bearer token
 // (see authMiddleware.js), not cookies, so credentials: true isn't needed.
-const configuredOrigins = (process.env.CLIENT_URL || "")
+const configuredOrigins = (process.env.CLIENT_URL || "http://localhost:5173")
   .split(",")
   .map((o) => o.trim())
   .filter(Boolean);

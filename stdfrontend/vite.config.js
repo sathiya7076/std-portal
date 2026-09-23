@@ -5,5 +5,15 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    proxy: {
+      '/auth': {
+        target: 'http://localhost:5000', // 👈 unga backend port inga podunga
+        changeOrigin: true,
+      },
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+    },
   },
 })
