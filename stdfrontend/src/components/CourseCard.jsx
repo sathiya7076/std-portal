@@ -1,6 +1,17 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 
+// Server base URL derived from the same env var api.js uses (strips trailing /api)
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+const SERVER_BASE = API_URL.replace(/\/api\/?$/, '')
+
+// Supports relative paths (/uploads/x.jpg) and full URLs (Cloudinary etc.)
+const getImageUrl = (img) => {
+  if (!img) return ''
+  if (/^(https?:|blob:|data:)/.test(img)) return img
+  return `${SERVER_BASE}${img.startsWith('/') ? '' : '/'}${img}`
+}
+
 export default function CourseCard({ course }) {
   return (
     <div className="col-md-6 col-xl-4 mb-4">
@@ -8,9 +19,10 @@ export default function CourseCard({ course }) {
         {course.image && (
           <div className="mb-3">
             <img
-              src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}${course.image}`}
+              src={getImageUrl(course.image)}
               alt={course.name}
-              className="w-100 rounded"
+              loading="lazy"
+              className="w-100 rounded course-card-img"
               style={{ height: '160px', objectFit: 'cover' }}
             />
           </div>
@@ -37,7 +49,12 @@ export default function CourseCard({ course }) {
         <p className="text-muted small flex-grow-1">{course.description}</p>
         <div className="d-flex justify-content-between small text-muted mb-3">
           <span><i className="bi bi-clock me-1"></i>{course.duration}</span>
-          {course.fees && <span><i className="bi bi-currency-rupee me-1"></i>{course.fees.toLocaleString('en-IN')}</span>}
+          {course.fees && (
+            <span>
+              <i className="bi bi-currency-rupee me-1"></i>
+              {course.fees.toLocaleString('en-IN')}
+            </span>
+          )}
         </div>
         <Link to={`/student/courses/${course.id}`} className="btn btn-primary-stms btn-sm w-100">
           View Details
