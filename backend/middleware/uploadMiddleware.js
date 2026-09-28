@@ -31,9 +31,15 @@ const MAX_MATERIAL_FILE_SIZE =
 const MAX_SUBMISSION_FILE_SIZE =
   parseInt(process.env.MAX_SUBMISSION_FILE_SIZE, 10) || 50 * 1024 * 1024;
 
+// FIXED: on serverless hosts (Vercel) the filesystem is read-only, so a bare
+// mkdirSync throws at require-time and crashes the whole API. Never crash here.
 const ensureDirExists = (dirPath) => {
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
+  try {
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+    }
+  } catch (err) {
+    console.warn(`Could not create upload dir ${dirPath}: ${err.message}`);
   }
 };
 
@@ -99,8 +105,31 @@ const courseImageFileFilter = (req, file, cb) => {
   cb(null, true);
 };
 
+// FIXED: serverless hosts (Vercel: /var/task) have a read-only filesystem, so
+// writing the image to disk throws "EROFS: read-only file system". Instead of
+// trusting an env variable, test whether the uploads folder is really writable.
+// If it is not, keep the image in memory; courseController then stores it as a
+// data URI in MongoDB. Locally it is still saved to /uploads/courses.
+const isDirWritable = (dirPath) => {
+  try {
+    ensureDirExists(dirPath);
+    fs.accessSync(dirPath, fs.constants.W_OK);
+    // accessSync can pass on read-only mounts, so also try a real write.
+    const probe = path.join(dirPath, `.write-test-${process.pid}`);
+    fs.writeFileSync(probe, "");
+    fs.unlinkSync(probe);
+    return true;
+  } catch (err) {
+    return false;
+  }
+};
+
+const courseUploadDir = path.join(__dirname, "..", "uploads", "courses");
+const useMemoryForCourseImages =
+  Boolean(process.env.VERCEL) || !isDirWritable(courseUploadDir);
+
 const uploadCourseImage = multer({
-  storage: buildStorage("courses"),
+  storage: useMemoryForCourseImages ? multer.memoryStorage() : buildStorage("courses"),
   fileFilter: courseImageFileFilter,
   limits: { fileSize: MAX_COURSE_IMAGE_SIZE },
 });
