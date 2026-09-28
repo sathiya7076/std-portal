@@ -57,6 +57,28 @@ const buildStorage = (subfolder) => {
   });
 };
 
+// FIXED: serverless hosts (Vercel: /var/task) have a read-only filesystem, so
+// writing an upload to disk throws "EROFS: read-only file system". Instead of
+// trusting an env variable, test whether the folder is really writable. If it is
+// not, multer keeps the file in memory (req.file.buffer) and the controller
+// stores the bytes in MongoDB. Locally files are still saved under /uploads.
+const isDirWritable = (dirPath) => {
+  try {
+    ensureDirExists(dirPath);
+    fs.accessSync(dirPath, fs.constants.W_OK);
+    // accessSync can pass on read-only mounts, so also try a real write.
+    const probe = path.join(dirPath, `.write-test-${process.pid}`);
+    fs.writeFileSync(probe, "");
+    fs.unlinkSync(probe);
+    return true;
+  } catch (err) {
+    return false;
+  }
+};
+
+const useMemoryStorage = (dirPath) =>
+  Boolean(process.env.VERCEL) || !isDirWritable(dirPath);
+
 const materialFileFilter = (req, file, cb) => {
   const ext = path.extname(file.originalname).toLowerCase();
   const isKnownMime = MATERIAL_ALLOWED_MIME.has(file.mimetype);
@@ -79,8 +101,12 @@ const submissionFileFilter = (req, file, cb) => {
   cb(null, true);
 };
 
+// FIXED: materials had the same EROFS problem as course images.
+const materialUploadDir = path.join(__dirname, "..", "uploads", "materials");
 const uploadMaterial = multer({
-  storage: buildStorage("materials"),
+  storage: useMemoryStorage(materialUploadDir)
+    ? multer.memoryStorage()
+    : buildStorage("materials"),
   fileFilter: materialFileFilter,
   limits: { fileSize: MAX_MATERIAL_FILE_SIZE },
 });
@@ -105,28 +131,8 @@ const courseImageFileFilter = (req, file, cb) => {
   cb(null, true);
 };
 
-// FIXED: serverless hosts (Vercel: /var/task) have a read-only filesystem, so
-// writing the image to disk throws "EROFS: read-only file system". Instead of
-// trusting an env variable, test whether the uploads folder is really writable.
-// If it is not, keep the image in memory; courseController then stores it as a
-// data URI in MongoDB. Locally it is still saved to /uploads/courses.
-const isDirWritable = (dirPath) => {
-  try {
-    ensureDirExists(dirPath);
-    fs.accessSync(dirPath, fs.constants.W_OK);
-    // accessSync can pass on read-only mounts, so also try a real write.
-    const probe = path.join(dirPath, `.write-test-${process.pid}`);
-    fs.writeFileSync(probe, "");
-    fs.unlinkSync(probe);
-    return true;
-  } catch (err) {
-    return false;
-  }
-};
-
 const courseUploadDir = path.join(__dirname, "..", "uploads", "courses");
-const useMemoryForCourseImages =
-  Boolean(process.env.VERCEL) || !isDirWritable(courseUploadDir);
+const useMemoryForCourseImages = useMemoryStorage(courseUploadDir);
 
 const uploadCourseImage = multer({
   storage: useMemoryForCourseImages ? multer.memoryStorage() : buildStorage("courses"),
@@ -134,4 +140,12 @@ const uploadCourseImage = multer({
   limits: { fileSize: MAX_COURSE_IMAGE_SIZE },
 });
 
-module.exports = { uploadMaterial, uploadSubmission, uploadCourseImage };
+// ADDED: lets /api/health report which storage mode this deployment is really
+// using, so you can verify the new code is live (old deployments lack this field).
+const uploadStorageMode = {
+  materials: useMemoryStorage(materialUploadDir) ? "memory(database)" : "disk",
+  courseImages: useMemoryForCourseImages ? "memory(database)" : "disk",
+  submissions: "disk",
+};
+
+module.exports = { uploadMaterial, uploadSubmission, uploadCourseImage, uploadStorageMode };

@@ -5,6 +5,7 @@ const morgan = require("morgan");
 const path = require("path");
 const connectDB = require("./config/db");
 const ApiError = require("./utils/ApiError");
+const { uploadStorageMode } = require("./middleware/uploadMiddleware");
 const { notFound } = require("./middleware/notFoundMiddleware");
 const { errorHandler } = require("./middleware/errorMiddleware");
 
@@ -102,7 +103,12 @@ app.get("/favicon.ico", (req, res) => res.status(204).end());
 
 // Health check
 app.get("/api/health", (req, res) => {
-  res.status(200).json({ success: true, message: "API is healthy" });
+  res.status(200).json({
+    success: true,
+    message: "API is healthy",
+    build: "upload-fix-v3", // if this is missing in the response, the OLD code is deployed
+    uploadStorage: uploadStorageMode,
+  });
 });
 
 // Mounted routes

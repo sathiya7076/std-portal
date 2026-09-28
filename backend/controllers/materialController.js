@@ -14,9 +14,36 @@ const { createBulkNotifications } = require("../services/notificationService");
 // Deletes a just-uploaded file from disk. Used to clean up orphaned
 // uploads when validation fails AFTER multer has already saved the file.
 const cleanupUploadedFile = (file) => {
-  if (!file) return;
+  // FIXED: memory uploads (Vercel) have no file.path; fs.unlink(undefined) throws.
+  if (!file || !file.path) return;
   fs.unlink(file.path, () => {}); // best-effort, ignore errors
 };
+
+// Only files saved on disk (/uploads/...) can be unlinked; DB-stored files can't.
+const removeDiskFile = (fileUrl) => {
+  if (!fileUrl || !fileUrl.startsWith("/uploads/")) return;
+  fs.unlink(path.join(__dirname, "..", fileUrl), () => {});
+};
+
+// @desc    Stream a material stored in the database
+// @route   GET /api/materials/:id/file
+// @access  Public (opened via window.open / <a>, which can't send the Bearer token)
+const getMaterialFile = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    throw new ApiError(400, "Invalid material id");
+  }
+  const material = await Material.findById(req.params.id).select("+fileBuffer +fileType");
+  if (!material || !material.fileBuffer) {
+    throw new ApiError(404, "File not found");
+  }
+  res.set("Content-Type", material.fileType || "application/octet-stream");
+  res.set(
+    "Content-Disposition",
+    `inline; filename="${encodeURIComponent(material.fileName || "material")}"`
+  );
+  res.set("Cache-Control", "private, max-age=3600");
+  return res.send(material.fileBuffer);
+});
 
 // @desc    Get materials (optionally filtered by course)
 // @route   GET /api/materials
@@ -81,9 +108,11 @@ const createMaterial = asyncHandler(async (req, res) => {
     throw new ApiError(400, "title, courseId, and type are required");
   }
 
-  if (!["PDF", "VIDEO"].includes(type)) {
+  // FIXED: the model and the upload form both support IMAGE, but the controller
+  // rejected it with a 400.
+  if (!["PDF", "VIDEO", "IMAGE"].includes(type)) {
     cleanupUploadedFile(req.file);
-    throw new ApiError(400, "type must be either 'PDF' or 'VIDEO'");
+    throw new ApiError(400, "type must be 'PDF', 'VIDEO' or 'IMAGE'");
   }
 
   if (!req.file) {
@@ -107,14 +136,23 @@ const createMaterial = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Trainer profile not found");
   }
 
-  const material = await Material.create({
+  const material = new Material({
     title,
     description,
     courseId,
     type,
-    fileUrl: `/uploads/materials/${req.file.filename}`,
+    fileName: req.file.originalname,
     uploadedBy: trainer._id,
   });
+  if (req.file.buffer) {
+    // read-only host (Vercel): keep the bytes in MongoDB
+    material.fileBuffer = req.file.buffer;
+    material.fileType = req.file.mimetype;
+    material.fileUrl = `/api/materials/${material._id}/file`;
+  } else {
+    material.fileUrl = `/uploads/materials/${req.file.filename}`;
+  }
+  await material.save();
 
   // Notify enrolled students — best-effort, and skip any student record
   // whose linked user account no longer exists (e.g. deleted user) so
@@ -166,17 +204,23 @@ const updateMaterial = asyncHandler(async (req, res) => {
   if (title !== undefined) material.title = title;
   if (description !== undefined) material.description = description;
   if (type !== undefined) {
-    if (!["PDF", "VIDEO"].includes(type)) {
+    if (!["PDF", "VIDEO", "IMAGE"].includes(type)) {
       cleanupUploadedFile(req.file);
-      throw new ApiError(400, "type must be either 'PDF' or 'VIDEO'");
+      throw new ApiError(400, "type must be 'PDF', 'VIDEO' or 'IMAGE'");
     }
     material.type = type;
   }
 
   if (req.file) {
-    const oldPath = path.join(__dirname, "..", material.fileUrl);
-    fs.unlink(oldPath, () => {});
-    material.fileUrl = `/uploads/materials/${req.file.filename}`;
+    removeDiskFile(material.fileUrl);
+    material.fileName = req.file.originalname;
+    if (req.file.buffer) {
+      material.fileBuffer = req.file.buffer;
+      material.fileType = req.file.mimetype;
+      material.fileUrl = `/api/materials/${material._id}/file`;
+    } else {
+      material.fileUrl = `/uploads/materials/${req.file.filename}`;
+    }
   }
 
   await material.save();
@@ -196,8 +240,7 @@ const deleteMaterial = asyncHandler(async (req, res) => {
     throw new ApiError(403, "You can only delete your own materials");
   }
 
-  const filePath = path.join(__dirname, "..", material.fileUrl);
-  fs.unlink(filePath, () => {});
+  removeDiskFile(material.fileUrl);
 
   await Material.deleteOne({ _id: material._id });
 
@@ -205,6 +248,7 @@ const deleteMaterial = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
+  getMaterialFile,
   getMaterials,
   getMaterialById,
   createMaterial,

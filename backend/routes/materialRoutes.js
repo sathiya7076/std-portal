@@ -1,5 +1,6 @@
 const express = require("express");
 const {
+  getMaterialFile,
   getMaterials,
   getMaterialById,
   createMaterial,
@@ -11,6 +12,9 @@ const { requireRole } = require("../middleware/roleMiddleware");
 const { uploadMaterial } = require("../middleware/uploadMiddleware");
 
 const router = express.Router();
+
+// ADDED: public file route — must be BEFORE protect (window.open can't send a token)
+router.get("/:id/file", getMaterialFile);
 
 router.use(protect);
 
