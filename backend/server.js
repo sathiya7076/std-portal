@@ -4,6 +4,7 @@ const cors = require("cors");
 const morgan = require("morgan");
 const path = require("path");
 const connectDB = require("./config/db");
+const ApiError = require("./utils/ApiError");
 const { notFound } = require("./middleware/notFoundMiddleware");
 const { errorHandler } = require("./middleware/errorMiddleware");
 
@@ -49,18 +50,41 @@ const configuredOrigins = (process.env.CLIENT_URL || "http://localhost:5173")
 const isLocalhost = (origin) =>
   /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 
+// FIXED: every Vercel deployment gets its own URL (production alias + one per
+// preview/deploy, e.g. std-portal-eet4-mjpc68ju5-<team>.vercel.app). Those were
+// not in CLIENT_URL, so login/register preflight (OPTIONS) failed with
+// "CORS: origin ... is not allowed". Allow this project's Vercel URLs automatically.
+const isProjectVercelOrigin = (origin) =>
+  /^https:\/\/std-portal[a-z0-9-]*\.vercel\.app$/.test(origin);
+
 app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true); // curl/Postman/server-to-server
       if (isLocalhost(origin)) return callback(null, true);
+      if (isProjectVercelOrigin(origin)) return callback(null, true);
       if (configuredOrigins.length === 0) return callback(null, true);
       if (configuredOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error(`CORS: origin '${origin}' is not allowed`));
+      // FIXED: was `new Error(...)`, which made the preflight return HTTP 500.
+      // Just don't add CORS headers; the browser blocks it cleanly.
+      console.warn(`CORS: origin '${origin}' is not allowed`);
+      return callback(null, false);
     },
     credentials: false,
   })
 );
+
+// FIXED: make sure MongoDB is connected before any route runs (serverless cold
+// starts). If it can't connect, return a clear JSON error instead of hanging.
+app.use(async (req, res, next) => {
+  if (req.method === "OPTIONS") return next();
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    next(new ApiError(503, `Database connection failed: ${err.message}`));
+  }
+});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -68,6 +92,13 @@ app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 
 // Static file serving for uploaded materials/submissions
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// ADDED: friendly root route (opening the API URL in a browser logged
+// "Route not found: /" and "/favicon.ico" as errors)
+app.get("/", (req, res) => {
+  res.status(200).json({ success: true, message: "STMS API is running" });
+});
+app.get("/favicon.ico", (req, res) => res.status(204).end());
 
 // Health check
 app.get("/api/health", (req, res) => {

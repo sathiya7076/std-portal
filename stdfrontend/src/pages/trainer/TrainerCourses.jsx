@@ -32,7 +32,7 @@ const TrainerCourses = () => {
       const data = await courseService.getAllCourses();
       setCourses(data);
     } catch (err) {
-      console.error("Failed to fetch courses:", err.response?.data || err.message);
+      console.error("Failed to fetch courses:", err.response?.data?.message || err.message);
     }
   };
 
@@ -92,7 +92,13 @@ const TrainerCourses = () => {
       await fetchCourses();
     } catch (err) {
       const serverErrors = err.response?.data?.errors;
-      setErrors(serverErrors && serverErrors.length ? serverErrors : [err.message]);
+      // FIXED: show the server's real message (e.g. "Database connection failed...")
+      // instead of only axios's generic "Request failed with status code 500".
+      setErrors(
+        serverErrors && serverErrors.length
+          ? serverErrors
+          : [err.response?.data?.message || err.message]
+      );
       console.error("Failed to create course. Status:", err.response?.status);
       console.error("Failed to create course. Data:", err.response?.data);
     } finally {

@@ -1,5 +1,6 @@
 const express = require("express");
 const {
+  getCourseImage,
   getCourses,
   getCourseById,
   createCourse,
@@ -11,6 +12,9 @@ const { requireRole } = require("../middleware/roleMiddleware");
 const { uploadCourseImage } = require("../middleware/uploadMiddleware");
 
 const router = express.Router();
+
+// ADDED: public image route — must be BEFORE protect, <img> can't send a token
+router.get("/:id/image", getCourseImage);
 
 router.use(protect);
 

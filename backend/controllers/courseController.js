@@ -7,6 +7,34 @@ const { sendSuccess } = require("../utils/apiResponse");
 const { getPagination, buildMeta } = require("../utils/paginate");
 const { createBulkNotifications } = require("../services/notificationService");
 
+// FIXED: turns the multer file into what is saved on the course.
+// Disk upload (local)      -> image = "/uploads/courses/<file>"
+// Memory upload (Vercel)   -> bytes go to imageBuffer, image URL is set after
+//                             the course id exists (see applyUploadedImage).
+const applyUploadedImage = (course, file) => {
+  if (!file) return;
+  if (file.buffer) {
+    course.imageBuffer = file.buffer;
+    course.imageType = file.mimetype;
+    course.image = `/api/courses/${course._id}/image`;
+  } else {
+    course.image = `/uploads/courses/${file.filename}`;
+  }
+};
+
+// @desc    Serve a course image stored in the database
+// @route   GET /api/courses/:id/image
+// @access  Public (an <img> tag cannot send the Bearer token)
+const getCourseImage = asyncHandler(async (req, res) => {
+  const course = await Course.findById(req.params.id).select("+imageBuffer +imageType");
+  if (!course || !course.imageBuffer) {
+    throw new ApiError(404, "Image not found");
+  }
+  res.set("Content-Type", course.imageType || "image/jpeg");
+  res.set("Cache-Control", "public, max-age=3600");
+  return res.send(course.imageBuffer);
+});
+
 // @desc    Get all courses (visible to both roles)
 // @route   GET /api/courses
 // @access  Private
@@ -72,29 +100,31 @@ const createCourse = asyncHandler(async (req, res) => {
   }
 
   // ADDED: image upload via multer's upload.single("image") -> req.file
-  const uploadedImage = req.file;
-  const imagePath = uploadedImage
-    ? `/uploads/courses/${uploadedImage.filename}`
-    : image;
-
-  const course = await Course.create({
+  const course = new Course({
     name,
     description,
     technologies,
     roadmap,
     duration,
     fees,
-    image: imagePath,
+    image, // only used when no file was uploaded
     code, // ADDED
     trainerId: trainer._id,
     status: "active",
   });
+  applyUploadedImage(course, req.file);
+  await course.save();
 
   trainer.courseIds.push(course._id);
   await trainer.save();
 
   const students = await Student.find().populate("userId", "_id");
-  const studentUserIds = students.map((s) => s.userId._id);
+  // FIXED: skip students whose user record is missing (populate -> null),
+  // otherwise `s.userId._id` throws AFTER the course is saved and the trainer
+  // sees a 500 error even though the course was created.
+  const studentUserIds = students
+    .filter((s) => s.userId && s.userId._id)
+    .map((s) => s.userId._id);
 
   await createBulkNotifications({
     userIds: studentUserIds,
@@ -137,10 +167,7 @@ const updateCourse = asyncHandler(async (req, res) => {
   });
 
   // ADDED: image upload via multer's upload.single("image") -> req.file
-  const uploadedImage = req.file;
-  if (uploadedImage) {
-    course.image = `/uploads/courses/${uploadedImage.filename}`;
-  }
+  applyUploadedImage(course, req.file);
 
   await course.save();
 
@@ -171,6 +198,7 @@ const deleteCourse = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
+  getCourseImage,
   getCourses,
   getCourseById,
   createCourse,

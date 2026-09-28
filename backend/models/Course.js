@@ -34,7 +34,18 @@ const courseSchema = new mongoose.Schema(
       ref: "Trainer",
     },
     image: {
-      type: String, // URL / path to image
+      type: String, // URL / path to image (or data URI on serverless hosts)
+    },
+    // ADDED: on read-only hosts (Vercel) the uploaded image bytes are kept here.
+    // select:false keeps them out of list/detail responses (they made the
+    // response huge -> 500/timeouts); they are served by GET /api/courses/:id/image.
+    imageBuffer: { type: Buffer, select: false },
+    imageType: { type: String, select: false },
+    // FIXED: `code` was sent by the controller/frontend but missing here, so
+    // Mongoose (strict mode) silently dropped it.
+    code: {
+      type: String,
+      trim: true,
     },
     status: {
       type: String,
@@ -42,7 +53,20 @@ const courseSchema = new mongoose.Schema(
       default: "active",
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    // FIXED: frontend reads `course.id` (CourseCard link, CourseDetails match,
+    // MyCourse, materials fetch) but Mongo only returns `_id`. Expose `id` too.
+    toJSON: {
+      virtuals: true,
+      transform: (doc, ret) => {
+        delete ret.imageBuffer;
+        delete ret.imageType;
+        return ret;
+      },
+    },
+    toObject: { virtuals: true },
+  }
 );
 
 courseSchema.index({ status: 1 });
