@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Layout from "../../components/Layout"; // ADDED
 import courseService from "../../services/courseService";
+import { getImageUrl } from "../../services/imageurl"; // ADDED
 
 const CourseList = () => {
   const [courses, setCourses] = useState([]);
@@ -170,7 +171,7 @@ const CourseList = () => {
                       <td>
                         {course.image ? (
                           <img
-                            src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}${course.image}`}
+                            src={getImageUrl(course.image)} /* FIXED: was localhost URL + course.image */
                             alt={course.name}
                             width="60"
                           />
