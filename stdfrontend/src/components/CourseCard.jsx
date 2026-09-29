@@ -1,64 +1,64 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { getImageUrl, PLACEHOLDER_IMAGE } from '../services/imageurl'
 
-// Server base URL derived from the same env var api.js uses (strips trailing /api)
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
-const SERVER_BASE = API_URL.replace(/\/api\/?$/, '')
+export default function CourseCard({ course, onClick }) {
+  if (!course) return null
 
-// Supports relative paths (/uploads/x.jpg) and full URLs (Cloudinary etc.)
-const getImageUrl = (img) => {
-  if (!img) return ''
-  if (/^(https?:|blob:|data:)/.test(img)) return img
-  return `${SERVER_BASE}${img.startsWith('/') ? '' : '/'}${img}`
-}
+  const technologies = Array.isArray(course.technologies)
+    ? course.technologies
+    : []
 
-export default function CourseCard({ course }) {
   return (
-    <div className="col-md-6 col-xl-4 mb-4">
-      <div className="surface-card p-4 h-100 d-flex flex-column">
-        {course.image && (
-          <div className="mb-3">
-            <img
-              src={getImageUrl(course.image)}
-              alt={course.name}
-              loading="lazy"
-              className="w-100 rounded course-card-img"
-              style={{ height: '160px', objectFit: 'cover' }}
-            />
+    <div className="col-12 col-sm-6 col-lg-4 mb-4">
+      <div
+        className="card h-100 shadow-sm"
+        style={{ cursor: onClick ? 'pointer' : 'default' }}
+        onClick={onClick}
+      >
+        <img
+          src={getImageUrl(course.image)}
+          alt={course.name}
+          className="card-img-top"
+          loading="lazy"
+          style={{ width: '100%', height: 180, objectFit: 'cover' }}
+          onError={(e) => {
+            e.currentTarget.onerror = null // avoid infinite loop
+            e.currentTarget.src = PLACEHOLDER_IMAGE
+          }}
+        />
+
+        <div className="card-body d-flex flex-column">
+          <h5 className="card-title fw-bold mb-1">{course.name}</h5>
+          {course.code && (
+            <small className="text-muted mb-2">Code: {course.code}</small>
+          )}
+
+          {course.description && (
+            <p className="card-text text-muted small">
+              {course.description.length > 100
+                ? course.description.slice(0, 100) + '...'
+                : course.description}
+            </p>
+          )}
+
+          {technologies.length > 0 && (
+            <div className="mb-2">
+              {technologies.map((t) => (
+                <span key={t} className="badge bg-light text-dark border me-1">
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-auto d-flex justify-content-between align-items-center">
+            <span className="text-muted small">
+              <i className="bi bi-clock me-1"></i>
+              {course.duration}
+            </span>
+            <span className="fw-bold">₹{course.fees}</span>
           </div>
-        )}
-
-        <div className="d-flex align-items-start justify-content-between mb-3">
-          <span className="stat-icon bg-indigo-soft">
-            <i className={`bi ${course.icon || 'bi-mortarboard'}`}></i>
-          </span>
-          {course.status && (
-            <span className={`badge rounded-pill ${course.status === 'New' ? 'bg-teal-soft text-teal' : 'bg-indigo-soft'}`}>
-              {course.status}
-            </span>
-          )}
         </div>
-
-        {course.code && (
-          <span className="badge bg-secondary-soft text-secondary mb-1 align-self-start">
-            {course.code}
-          </span>
-        )}
-
-        <h5 className="fw-semibold mb-1">{course.name}</h5>
-        <p className="text-muted small flex-grow-1">{course.description}</p>
-        <div className="d-flex justify-content-between small text-muted mb-3">
-          <span><i className="bi bi-clock me-1"></i>{course.duration}</span>
-          {course.fees && (
-            <span>
-              <i className="bi bi-currency-rupee me-1"></i>
-              {course.fees.toLocaleString('en-IN')}
-            </span>
-          )}
-        </div>
-        <Link to={`/student/courses/${course.id}`} className="btn btn-primary-stms btn-sm w-100">
-          View Details
-        </Link>
       </div>
     </div>
   )
