@@ -42,10 +42,10 @@ export default function TrainerStudentDetail() {
           {/* FIXED: display studentId, not _id */}
           <p className="text-muted mb-0">{s.studentId} • {s.course}</p>
         </div>
-        <div className="d-flex gap-2">
+        {/* <div className="d-flex gap-2">
           <button className="btn btn-outline-secondary btn-sm"><i className="bi bi-pencil me-1"></i>Edit</button>
           <button className="btn btn-outline-danger btn-sm"><i className="bi bi-trash me-1"></i>Delete</button>
-        </div>
+        </div> */}
       </div>
 
       <div className="row">
@@ -61,9 +61,7 @@ export default function TrainerStudentDetail() {
                 <tr><td className="text-muted">Email</td><td className="fw-semibold">{s.email}</td></tr>
                 <tr><td className="text-muted">Phone</td><td className="fw-semibold">{s.phone}</td></tr>
                 <tr><td className="text-muted">Address</td><td className="fw-semibold">{s.address}</td></tr>
-                <tr><td className="text-muted">Total Working Days</td><td className="fw-semibold">{s.totalWorkingDays}</td></tr>
-                <tr><td className="text-muted">Present</td><td className="fw-semibold text-teal">{s.present}</td></tr>
-                <tr><td className="text-muted">Absent</td><td className="fw-semibold text-danger">{s.absent}</td></tr>
+                
               </tbody>
             </table>
           </div>
@@ -75,9 +73,7 @@ export default function TrainerStudentDetail() {
             <ProgressBar label="Learning Progress" percent={s.progress} />
           </div>
           <div className="d-flex gap-2 flex-wrap">
-            <button className="btn btn-outline-secondary btn-sm flex-fill"><i className="bi bi-calendar-check me-1"></i>View Attendance</button>
-            <button className="btn btn-outline-secondary btn-sm flex-fill"><i className="bi bi-clipboard-check me-1"></i>View Tasks</button>
-            <button className="btn btn-outline-secondary btn-sm flex-fill"><i className="bi bi-graph-up me-1"></i>View Progress</button>
+           
           </div>
         </div>
       </div>

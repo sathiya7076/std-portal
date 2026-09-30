@@ -42,19 +42,16 @@ export default function Login() {
     <div className="login-page">
       <div className="login-card">
         <div className="text-center mb-4">
-          <span className="brand-mark d-inline-flex mb-3" style={{ width: 46, height: 46, fontSize: '1.2rem' }}>S</span>
+          <span className="brand-mark d-inline-flex mb-3" style={{ width: 46, height: 46, fontSize: '1.2rem' }}></span>
           <h4 className="font-display fw-bold mb-1">Smart Training Management System</h4>
           <p className="text-muted small mb-0">Sign in to continue to your dashboard</p>
         </div>
 
-        <div className="role-toggle mb-4">
-          <button type="button" className={role === 'student' ? 'active' : ''} onClick={() => setRole('student')}>
-            <i className="bi bi-mortarboard me-1"></i> Student Login
-          </button>
-          <button type="button" className={role === 'trainer' ? 'active' : ''} onClick={() => setRole('trainer')}>
-            <i className="bi bi-person-workspace me-1"></i> Trainer Login
-          </button>
-        </div>
+        <div className="text-center mb-4">
+  <h5 className="fw-bold mb-0 logo">
+    <i className="bi bi-person-circle me-2"></i> User Login
+  </h5>
+</div>
 
         {serverError && (
           <div className="alert alert-danger py-2 small" role="alert">
@@ -96,9 +93,9 @@ export default function Login() {
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
               />
-              <label className="form-check-label small" htmlFor="rememberMe">Remember Me</label>
+              
             </div>
-            <a href="#!" className="small text-decoration-none">Forgot Password?</a>
+
           </div>
 
           <button type="submit" className="btn btn-primary-stms w-100 py-2" disabled={loading}>

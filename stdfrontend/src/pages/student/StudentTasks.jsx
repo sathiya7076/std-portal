@@ -65,7 +65,7 @@ export default function StudentTasks() {
         {['All', 'Pending', 'Submitted', 'Completed'].map((f) => (
           <button
             key={f}
-            className={`btn btn-sm ${filter === f ? 'btn-primary-stms' : 'btn-outline-secondary'}`}
+            className={`btn nbtn btn-sm ${filter === f ? 'btn-primary-stms' : 'btn-outline-secondary'}`}
             onClick={() => setFilter(f)}
           >
             {f}

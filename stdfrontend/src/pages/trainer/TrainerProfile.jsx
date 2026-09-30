@@ -77,7 +77,7 @@ export default function TrainerProfile() {
         {!editing ? (
           <table className="table table-borderless mb-0">
             <tbody>
-              <tr><td className="text-muted">Trainer Name</td><td className="fw-semibold">{profile?.trainerName}</td></tr>
+              <tr><td className="text-muted nam ">Trainer Name</td><td className="fw-semibold">{profile?.trainerName}</td></tr>
               <tr><td className="text-muted">Trainer ID</td><td className="fw-semibold">{profile?.trainerId}</td></tr>
               <tr><td className="text-muted">Email</td><td className="fw-semibold">{profile?.email}</td></tr>
               <tr><td className="text-muted">Phone</td><td className="fw-semibold">{profile?.phone}</td></tr>
@@ -89,7 +89,7 @@ export default function TrainerProfile() {
               </tr>
               <tr><td className="text-muted">Experience</td><td className="fw-semibold">{profile?.experience}</td></tr>
               <tr>
-                <td className="text-muted">Specialization</td>
+                {/* <td className="text-muted">Specialization</td> */}
                 <td>
                   {profile?.specialization?.map((s) => (
                     <span key={s} className="badge bg-indigo-soft me-1">{s}</span>
