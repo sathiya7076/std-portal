@@ -30,8 +30,12 @@ export default function Login() {
     setLoading(true)
     try {
       const user = await login({ role, id, password, rememberMe })
+      // Works for admin too: role "admin" -> /admin/dashboard
+      // (route is defined in App.jsx under the /admin AdminRoute).
       navigate(`/${user.role}/dashboard`)
     } catch (err) {
+      // Backend messages (e.g. "Your account is pending admin approval")
+      // are shown as-is, so a pending trainer sees the real reason.
       setServerError(err?.response?.data?.message || 'Invalid credentials. Please try again.')
     } finally {
       setLoading(false)
@@ -93,7 +97,10 @@ export default function Login() {
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
               />
+              {/* FIXED: the checkbox had no label, so users saw an unexplained box */}
+              <label className="form-check-label small" htmlFor="rememberMe">
               
+              </label>
             </div>
 
           </div>

@@ -3,6 +3,18 @@ import Layout from '../../components/Layout'
 import { useAuth } from '../../context/AuthContext'
 import trainerService from '../../services/trainerService'
 
+// FIXED helper: `specialization` is a plain string in your seed data
+// ("Full Stack Development & Cloud Architecture") but the page called
+// .map() on it, which crashes ("specialization.map is not a function").
+// Accept an array OR a string (comma separated).
+const toList = (value) => {
+  if (Array.isArray(value)) return value.filter(Boolean)
+  if (typeof value === 'string' && value.trim()) {
+    return value.split(',').map((v) => v.trim()).filter(Boolean)
+  }
+  return []
+}
+
 export default function TrainerProfile() {
   const { updateUser } = useAuth()
   const [profile, setProfile] = useState(null)
@@ -40,8 +52,20 @@ export default function TrainerProfile() {
         phone: form.phone,
         experience: form.experience,
       })
-      setProfile(updated)
-      updateUser({ phone: updated.phone, experience: updated.experience })
+      // FIXED: `setProfile(updated)` replaced the whole profile, so nested
+      // data (teachingCourses, specialization, name) vanished whenever the
+      // update response was shallower than getProfile(). Merge only the
+      // fields that were actually edited.
+      setProfile((prev) => ({
+        ...prev,
+        phone: updated?.phone ?? form.phone,
+        experience: updated?.experience ?? form.experience,
+      }))
+      // FIXED: guard in case AuthContext doesn't expose updateUser, which
+      // would otherwise throw after a successful save and show a false error.
+      if (typeof updateUser === 'function') {
+        updateUser({ phone: updated?.phone ?? form.phone, experience: updated?.experience ?? form.experience })
+      }
       setSaved(true)
       setEditing(false)
       setTimeout(() => setSaved(false), 2000)
@@ -60,6 +84,9 @@ export default function TrainerProfile() {
       </Layout>
     )
   }
+
+  const teachingCourses = Array.isArray(profile?.teachingCourses) ? profile.teachingCourses : []
+  const specializations = toList(profile?.specialization)
 
   return (
     <Layout breadcrumb={['Trainer', 'Trainer Profile']}>
@@ -84,14 +111,14 @@ export default function TrainerProfile() {
               <tr>
                 <td className="text-muted">Teaching Course</td>
                 <td className="fw-semibold">
-                  {profile?.teachingCourses?.map((c) => c.name).join(', ') || '—'}
+                  {teachingCourses.map((c) => c.name).join(', ') || '—'}
                 </td>
               </tr>
               <tr><td className="text-muted">Experience</td><td className="fw-semibold">{profile?.experience}</td></tr>
               <tr>
                 {/* <td className="text-muted">Specialization</td> */}
                 <td>
-                  {profile?.specialization?.map((s) => (
+                  {specializations.map((s) => (
                     <span key={s} className="badge bg-indigo-soft me-1">{s}</span>
                   ))}
                 </td>

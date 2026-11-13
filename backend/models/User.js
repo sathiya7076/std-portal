@@ -24,13 +24,30 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["student", "trainer"],
+      enum: ["student", "trainer", "admin"], // ADDED: "admin"
       required: [true, "Role is required"],
     },
     isActive: {
       type: Boolean,
       default: true,
     },
+
+    // ---------------- ADDED: admin details ----------------
+    phone: { type: String, trim: true },
+    designation: { type: String, trim: true }, // e.g. "Super Admin"
+    department: { type: String, trim: true }, // e.g. "Administration"
+
+    // ---------------- ADDED: trainer approval workflow ----------------
+    // student / admin => "approved" automatically
+    // trainer         => "pending" until an admin approves
+    approvalStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "approved",
+    },
+    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    approvedAt: { type: Date },
+    rejectionReason: { type: String, trim: true },
   },
   { timestamps: true }
 );

@@ -38,8 +38,28 @@ const protect = asyncHandler(async (req, res, next) => {
     throw new ApiError(403, "This account has been deactivated");
   }
 
+  // ADDED: trainer must be approved by admin (also blocks old tokens
+  // if admin rejects a trainer later)
+  if (
+    user.role === "trainer" &&
+    (user.approvalStatus === "pending" || user.approvalStatus === "rejected")
+  ) {
+    throw new ApiError(403, "Your trainer account is not approved by admin");
+  }
+
   req.user = user; // full user doc (password excluded by schema)
   next();
 });
 
-module.exports = { protect };
+/**
+ * ADDED: role guard. Use after `protect`.
+ * Example: router.use(protect, authorize("admin"));
+ */
+const authorize = (...roles) => (req, res, next) => {
+  if (!req.user || !roles.includes(req.user.role)) {
+    throw new ApiError(403, "You do not have permission for this action");
+  }
+  next();
+};
+
+module.exports = { protect, authorize };

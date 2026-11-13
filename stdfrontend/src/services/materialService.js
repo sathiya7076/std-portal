@@ -53,7 +53,12 @@ const materialService = {
     // Do NOT manually set Content-Type here — axios needs to generate the
     // multipart boundary itself, or the backend can't parse the body and
     // every field (including courseId) arrives empty.
-    const { data } = await api.post('/materials', formData)
+    const { data } = await api.post('/materials', formData, {
+      // The shared API timeout is short for normal requests; videos can take
+      // much longer to transfer, so give material uploads a dedicated window.
+      timeout: 5 * 60 * 1000,
+      onUploadProgress: payload.onUploadProgress,
+    })
     return extractData(data)
   },
 

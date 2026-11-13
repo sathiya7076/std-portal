@@ -11,6 +11,7 @@ const { errorHandler } = require("./middleware/errorMiddleware");
 
 // Route imports
 const authRoutes = require("./routes/authRoutes");
+const adminRoutes = require("./routes/adminRoutes"); // ADDED: admin role routes
 const studentRoutes = require("./routes/studentRoutes");
 const studentSelfRoutes = require("./routes/studentSelfRoutes");
 const trainerRoutes = require("./routes/trainerRoutes");
@@ -113,6 +114,7 @@ app.get("/api/health", (req, res) => {
 
 // Mounted routes
 app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes); // ADDED: admin role routes (dashboard, trainers, students, courses, admins)
 app.use("/api/students", studentRoutes);
 app.use("/api/student", studentSelfRoutes);
 app.use("/api/trainer", trainerRoutes);

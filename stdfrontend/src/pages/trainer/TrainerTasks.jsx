@@ -25,11 +25,13 @@ export default function TrainerTasks() {
   const [form, setForm] = useState(initialForm)
   const [errors, setErrors] = useState({})
   const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState('') // ADDED
 
   const [viewingTask, setViewingTask] = useState(null) // full task-details modal
   const [evalForm, setEvalForm] = useState({ score: '', feedback: '' })
   const [showEvalForm, setShowEvalForm] = useState(false)
   const [submittingEval, setSubmittingEval] = useState(false)
+  const [evalError, setEvalError] = useState('') // ADDED
 
   const load = async () => {
     setState({ loading: true, error: null, tasks: [] })
@@ -39,7 +41,7 @@ export default function TrainerTasks() {
         taskService.getStudentTasks(),
         courseService.getAllCourses(),
       ])
-      setState({ loading: false, error: null, tasks })
+      setState({ loading: false, error: null, tasks: Array.isArray(tasks) ? tasks : [] })
       setCourses(Array.isArray(courseList) ? courseList : [])
     } catch {
       setState({ loading: false, error: 'Unable to load tasks.', tasks: [] })
@@ -78,6 +80,9 @@ export default function TrainerTasks() {
     e.preventDefault()
     if (!validate()) return
     setCreating(true)
+    setCreateError('')
+    // FIXED: there was no catch, so a failed createTask became an unhandled
+    // rejection and the trainer saw nothing.
     try {
       const newTask = await taskService.createTask({
         ...form,
@@ -99,6 +104,9 @@ export default function TrainerTasks() {
       setShowForm(false)
       setForm(initialForm)
       setErrors({})
+    } catch (err) {
+      console.error('Failed to create task:', err?.response?.data || err.message)
+      setCreateError(err?.response?.data?.message || 'Could not create the task. Please try again.')
     } finally {
       setCreating(false)
     }
@@ -108,18 +116,31 @@ export default function TrainerTasks() {
     setViewingTask(task)
     setEvalForm({ score: task.score ?? '', feedback: task.feedback ?? '' })
     setShowEvalForm(false)
+    setEvalError('')
   }
 
   const closeTaskDetails = () => {
     setViewingTask(null)
     setShowEvalForm(false)
+    setEvalError('')
   }
+
+  // FIXED: the student name in the details modal was hardcoded to
+  // "Sathiya Moorthy" and evaluation was always sent for 'STU001' (leftover
+  // mock data), so every task showed the same name and grades could go to
+  // the wrong student. Read both from the task / submission instead, falling
+  // back to the old values only if the backend doesn't send them.
+  const taskStudentName = (t) =>
+    t?.studentName ?? t?.submission?.studentName ?? t?.student?.name ?? '—'
+  const taskStudentId = (t) =>
+    t?.studentId ?? t?.submission?.studentId ?? t?.student?.studentId ?? 'STU001'
 
   const submitEvaluation = async (e) => {
     e.preventDefault()
     setSubmittingEval(true)
+    setEvalError('')
     try {
-      await taskService.evaluateSubmission(viewingTask.id, 'STU001', evalForm)
+      await taskService.evaluateSubmission(viewingTask.id, taskStudentId(viewingTask), evalForm)
       const updatedTask = {
         ...viewingTask,
         status: 'Completed',
@@ -145,6 +166,10 @@ export default function TrainerTasks() {
       }
 
       setShowEvalForm(false)
+    } catch (err) {
+      // FIXED: no catch before — a failed evaluation was silent.
+      console.error('Failed to evaluate submission:', err?.response?.data || err.message)
+      setEvalError(err?.response?.data?.message || 'Could not save the evaluation. Please try again.')
     } finally {
       setSubmittingEval(false)
     }
@@ -174,6 +199,7 @@ export default function TrainerTasks() {
       {showForm && (
         <div className="surface-card p-4 mb-4">
           <h6 className="fw-semibold mb-3">Create Task</h6>
+          {createError && <div className="alert alert-danger py-2 small">{createError}</div>}
           <form onSubmit={handleCreate}>
             <div className="row">
               <div className="col-md-6 mb-3">
@@ -221,7 +247,7 @@ export default function TrainerTasks() {
           <h6 className="fw-semibold mb-3">Today's Tasks</h6>
           <div className="row">
             {todaysTasks.map((t) => (
-              <div className="col-md-4 mb-3" key={t.id}>
+              <div className="col-md-4 mb-3" key={t.id ?? t._id}>
                 <div
                   className="border rounded p-3 h-100"
                   style={{ cursor: 'pointer' }}
@@ -252,7 +278,7 @@ export default function TrainerTasks() {
                 </tr>
               ) : (
                 state.tasks.map((t) => (
-                  <tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => openTaskDetails(t)}>
+                  <tr key={t.id ?? t._id} style={{ cursor: 'pointer' }} onClick={() => openTaskDetails(t)}>
                     <td className="fw-semibold">{t.title}</td>
                     <td>{t.course}</td>
                     <td><span className={`badge ${statusBadgeClass(t.status)}`}>{t.status}</span></td>
@@ -323,7 +349,8 @@ export default function TrainerTasks() {
 
                   <div className="mb-3">
                     <p className="text-muted small mb-1">Student Name</p>
-                    <p className="fw-semibold mb-0">Sathiya Moorthy</p>
+                    {/* FIXED: was hardcoded "Sathiya Moorthy" */}
+                    <p className="fw-semibold mb-0">{taskStudentName(viewingTask)}</p>
                   </div>
 
                   {viewingTask.status === 'Pending' && (
@@ -377,6 +404,7 @@ export default function TrainerTasks() {
 
                   {viewingTask.status === 'Submitted' && showEvalForm && (
                     <form onSubmit={submitEvaluation} className="border-top pt-3 mt-2">
+                      {evalError && <div className="alert alert-danger py-2 small">{evalError}</div>}
                       <div className="mb-3">
                         <label className="form-label small fw-semibold">Score / 100</label>
                         <input

@@ -18,6 +18,14 @@ const getCourseId = (c) => (c ? c._id || c.id : undefined)
 // doesn't stay disabled just because of a naming mismatch.
 const getFileUrl = (m) => m?.fileUrl || m?.url || m?.filePath || m?.path || null
 
+// FIXED: `new Date(undefined).toLocaleDateString()` renders "Invalid Date"
+// when a material has neither uploadedDate nor createdAt.
+const formatDate = (value) => {
+  if (!value) return '—'
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString()
+}
+
 export default function TrainerMaterials() {
   const [state, setState] = useState({ loading: true, error: null, materials: [] })
   const [courses, setCourses] = useState([])
@@ -26,7 +34,12 @@ export default function TrainerMaterials() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [errors, setErrors] = useState({})
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadError, setUploadError] = useState('')
+  // FIXED: a failed delete used to set `state.error`, which replaced the
+  // whole page with the full-page ErrorMessage (and its Retry reloaded
+  // everything). Use a small inline alert instead.
+  const [actionError, setActionError] = useState('')
 
   const load = async () => {
     setState({ loading: true, error: null, materials: [] })
@@ -60,13 +73,14 @@ export default function TrainerMaterials() {
 
   const acceptFor = (format) => {
     if (format === 'pdf') return 'application/pdf'
-    if (format === 'video') return 'video/*'
-    return 'image/*'
+    if (format === 'video') return 'video/mp4,video/quicktime,video/x-matroska,video/webm,.mp4,.mov,.mkv,.webm'
+    return 'image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp'
   }
 
   const handleUpload = async (e) => {
     e.preventDefault()
     setUploadError('')
+    setUploadProgress(0)
     if (!validate()) return
 
     setUploading(true)
@@ -77,6 +91,11 @@ export default function TrainerMaterials() {
         description: form.description,
         format: form.format,
         file: selectedFile,
+        onUploadProgress: (event) => {
+          if (event.total) {
+            setUploadProgress(Math.round((event.loaded * 100) / event.total))
+          }
+        },
       })
       setState((s) => ({ ...s, materials: [material, ...s.materials] }))
 
@@ -92,18 +111,26 @@ export default function TrainerMaterials() {
       setSelectedFile(null)
       setErrors({})
     } catch (err) {
-      setUploadError(err?.response?.data?.message || 'Failed to upload material. Please try again.')
+      setUploadError(
+        err?.response?.data?.message ||
+        (err?.code === 'ECONNABORTED'
+          ? 'The upload took too long. Check your connection and try again.'
+          : 'Failed to upload material. Please try again.')
+      )
     } finally {
       setUploading(false)
     }
   }
 
   const handleDelete = async (id) => {
+    // FIXED: deleted instantly on a single click with no confirmation
+    if (!window.confirm('Delete this material? This cannot be undone.')) return
+    setActionError('')
     try {
       await materialService.deleteMaterial(id)
       setState((s) => ({ ...s, materials: s.materials.filter((m) => (m._id || m.id) !== id) }))
     } catch {
-      setState((s) => ({ ...s, error: 'Failed to delete material.' }))
+      setActionError('Failed to delete material. Please try again.')
     }
   }
 
@@ -127,6 +154,8 @@ export default function TrainerMaterials() {
           <i className="bi bi-upload me-1"></i> Upload Material
         </button>
       </div>
+
+      {actionError && <div className="alert alert-danger py-2 small">{actionError}</div>}
 
       {showForm && (
         <div className="surface-card p-4 mb-4">
@@ -182,7 +211,7 @@ export default function TrainerMaterials() {
               </div>
             </div>
             <button className="btn btn-primary-stms" disabled={uploading}>
-              {uploading ? <><span className="spinner-border spinner-border-sm me-2"></span>Uploading...</> : 'Upload Material'}
+              {uploading ? <><span className="spinner-border spinner-border-sm me-2"></span>Uploading... {uploadProgress}%</> : 'Upload Material'}
             </button>
           </form>
         </div>
@@ -207,7 +236,7 @@ export default function TrainerMaterials() {
                           {m.type}
                         </span>
                       </td>
-                      <td>{new Date(m.uploadedDate || m.createdAt).toLocaleDateString()}</td>
+                      <td>{formatDate(m.uploadedDate || m.createdAt)}</td>
                       <td>
                         <div className="d-flex gap-1">
                           <button
@@ -232,4 +261,4 @@ export default function TrainerMaterials() {
       )}
     </Layout>
   )
-}
+} 

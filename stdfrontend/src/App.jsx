@@ -28,6 +28,9 @@ import TrainerMaterials from './pages/trainer/TrainerMaterials'
 import TrainerProfile from './pages/trainer/TrainerProfile'
 import CourseList from './pages/trainer/Courselist'
 
+// ADDED: admin pages (all admin routes live in pages/admin/adminRoutes.jsx)
+import adminRoutes from './pages/admin/adminRoutes'
+
 export default function App() {
   return (
     <Routes>
@@ -59,6 +62,10 @@ export default function App() {
       <Route path="/trainer/tasks" element={<ProtectedRoute role="trainer"><TrainerTasks /></ProtectedRoute>} />
       <Route path="/trainer/materials" element={<ProtectedRoute role="trainer"><TrainerMaterials /></ProtectedRoute>} />
       <Route path="/trainer/profile" element={<ProtectedRoute role="trainer"><TrainerProfile /></ProtectedRoute>} />
+
+      {/* ADDED: Admin routes (/admin/dashboard, /admin/trainers, /admin/students, /admin/courses, /admin/admins).
+          Must stay ABOVE the "*" catch-all below, otherwise /admin/... redirects to /login. */}
+      {adminRoutes}
 
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>

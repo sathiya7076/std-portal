@@ -33,7 +33,14 @@ const register = asyncHandler(async (req, res) => {
     throw new ApiError(409, "A user with this email already exists");
   }
 
-  const user = await User.create({ name, email, password, role });
+  // CHANGED: trainer starts as "pending" until an admin approves
+  const user = await User.create({
+    name,
+    email,
+    password,
+    role,
+    approvalStatus: role === "trainer" ? "pending" : "approved",
+  });
 
   // DEBUG: confirm what was actually stored at registration time
   console.log("[REGISTER] Created user:", {
@@ -57,6 +64,25 @@ const register = asyncHandler(async (req, res) => {
     });
   }
 
+  // ADDED: trainer cannot login yet, so no token is issued
+  if (role === "trainer") {
+    return sendSuccess(
+      res,
+      201,
+      "Registration successful. Please wait for admin approval before login.",
+      {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          approvalStatus: user.approvalStatus,
+        },
+        profile,
+      }
+    );
+  }
+
   const token = generateToken(user._id, user.role);
 
   return sendSuccess(res, 201, "Registration successful", {
@@ -68,6 +94,56 @@ const register = asyncHandler(async (req, res) => {
       role: user.role,
     },
     profile,
+  });
+});
+
+// @desc    Register a new admin (protected by ADMIN_SECRET_KEY in .env)
+// @route   POST /api/auth/register-admin
+// @access  Public (but needs the secret key)
+const registerAdmin = asyncHandler(async (req, res) => {
+  const { name, email, password, phone, designation, department, adminSecret } =
+    req.body;
+
+  if (
+    !process.env.ADMIN_SECRET_KEY ||
+    adminSecret !== process.env.ADMIN_SECRET_KEY
+  ) {
+    throw new ApiError(403, "Invalid admin secret key");
+  }
+
+  if (!name || !email || !password) {
+    throw new ApiError(400, "Name, email and password are required");
+  }
+
+  const existingUser = await User.findOne({ email: email.toLowerCase() });
+  if (existingUser) {
+    throw new ApiError(409, "A user with this email already exists");
+  }
+
+  const admin = await User.create({
+    name,
+    email,
+    password,
+    phone,
+    designation,
+    department,
+    role: "admin",
+    approvalStatus: "approved",
+  });
+
+  const token = generateToken(admin._id, admin.role);
+
+  return sendSuccess(res, 201, "Admin registered successfully", {
+    token,
+    user: {
+      id: admin._id,
+      name: admin.name,
+      email: admin.email,
+      role: admin.role,
+      phone: admin.phone,
+      designation: admin.designation,
+      department: admin.department,
+    },
   });
 });
 
@@ -115,6 +191,21 @@ const login = asyncHandler(async (req, res) => {
     throw new ApiError(403, "This account has been deactivated");
   }
 
+  // ADDED: trainer can login only after admin approval
+  if (user.role === "trainer") {
+    if (user.approvalStatus === "pending") {
+      throw new ApiError(403, "Your account is pending admin approval");
+    }
+    if (user.approvalStatus === "rejected") {
+      throw new ApiError(
+        403,
+        `Your trainer request was rejected by admin${
+          user.rejectionReason ? ": " + user.rejectionReason : ""
+        }`
+      );
+    }
+  }
+
   const token = generateToken(user._id, user.role);
 
   return sendSuccess(res, 200, "Login successful", {
@@ -140,7 +231,8 @@ const getMe = asyncHandler(async (req, res) => {
       "courseId",
       "name duration fees"
     );
-  } else {
+  } else if (user.role === "trainer") {
+    // CHANGED: was a plain `else`; admin has no Trainer profile
     profile = await Trainer.findOne({ userId: user._id }).populate(
       "courseIds",
       "name"
@@ -159,4 +251,4 @@ const getMe = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { register, login, getMe };
+module.exports = { register, registerAdmin, login, getMe };

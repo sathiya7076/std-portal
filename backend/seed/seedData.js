@@ -1,6 +1,7 @@
 /**
  * Seeds the database with sample data:
- * - 1 trainer
+ * - 5 admins (ADDED)
+ * - 1 trainer (approved) + 1 pending trainer for testing approval (ADDED)
  * - 5 students
  * - 4 courses
  * - Attendance, Tasks, Materials, Fees, Payments, Notifications
@@ -77,7 +78,47 @@ const STUDENT_DEFS = [
   { name: "Kabir Singh", email: "kabir.singh@example.com" },
 ];
 
+// ADDED: 5 example admins with their details
+const ADMIN_DEFS = [
+  {
+    name: "Sathiyamoorthy",
+    email: "c",
+    phone: "9876543210",
+    designation: "Super Admin",
+    department: "Administration",
+  },
+  {
+    name: "Priya Lakshmi",
+    email: "priya.admin@example.com",
+    phone: "9876543211",
+    designation: "Training Coordinator",
+    department: "Training",
+  },
+  {
+    name: "Karthik Raja",
+    email: "karthik.admin@example.com",
+    phone: "9876543212",
+    designation: "Operations Manager",
+    department: "Operations",
+  },
+  {
+    name: "Meena Devi",
+    email: "meena.admin@example.com",
+    phone: "9876543213",
+    designation: "Student Affairs Admin",
+    department: "Student Affairs",
+  },
+  {
+    name: "Arun Kumar",
+    email: "arun.admin@example.com",
+    phone: "9876543214",
+    designation: "Content Manager",
+    department: "Content & Courses",
+  },
+];
+
 const DEFAULT_PASSWORD = "Password@123";
+const ADMIN_PASSWORD = "Admin@123"; // ADDED
 
 const generateShortId = (prefix, i) => `${prefix}-${String(i).padStart(4, "0")}`;
 
@@ -102,12 +143,23 @@ const destroy = async () => {
 const seed = async () => {
   await destroy();
 
+  // --- Admins (ADDED) ---
+  for (const def of ADMIN_DEFS) {
+    await User.create({
+      ...def,
+      password: ADMIN_PASSWORD,
+      role: "admin",
+      approvalStatus: "approved",
+    });
+  }
+
   // --- Trainer ---
   const trainerUser = await User.create({
     name: "Dr. Ananya Iyer",
     email: "trainer@example.com",
     password: DEFAULT_PASSWORD,
     role: "trainer",
+    approvalStatus: "approved", // ADDED: seeded trainer can login directly
   });
 
   const trainer = await Trainer.create({
@@ -116,6 +168,24 @@ const seed = async () => {
     experience: 8,
     specialization: "Full Stack Development & Cloud Architecture",
     phone: "9876500000",
+    courseIds: [],
+  });
+
+  // --- Pending trainer (ADDED: to test the admin approval flow) ---
+  const pendingTrainerUser = await User.create({
+    name: "Vikram Nair",
+    email: "pending.trainer@example.com",
+    password: DEFAULT_PASSWORD,
+    role: "trainer",
+    approvalStatus: "pending",
+  });
+
+  await Trainer.create({
+    userId: pendingTrainerUser._id,
+    trainerId: generateShortId("TRN", 2),
+    experience: 3,
+    specialization: "Digital Marketing",
+    phone: "9876500001",
     courseIds: [],
   });
 
@@ -260,7 +330,12 @@ const seed = async () => {
   }
 
   console.log("Seed data created successfully.");
+  console.log("Admin logins:"); // ADDED
+  ADMIN_DEFS.forEach((a) => console.log(`  ${a.email} / ${ADMIN_PASSWORD}`));
   console.log(`Trainer login: trainer@example.com / ${DEFAULT_PASSWORD}`);
+  console.log(
+    `Pending trainer (cannot login until admin approves): pending.trainer@example.com / ${DEFAULT_PASSWORD}`
+  ); // ADDED
   console.log("Student logins:");
   STUDENT_DEFS.forEach((s) => console.log(`  ${s.email} / ${DEFAULT_PASSWORD}`));
 };

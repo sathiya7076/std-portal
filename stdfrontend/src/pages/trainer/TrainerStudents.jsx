@@ -6,7 +6,7 @@ import ErrorMessage from '../../components/ErrorMessage'
 import EmptyState from '../../components/EmptyState'
 import ConfirmModal from '../../components/ConfirmModal'
 import studentService from '../../services/studentService'
-import { mockCourses } from '../../mock/mockData'
+import courseService from '../../services/courseService' // FIXED: real courses instead of mockCourses
 
 const PAGE_SIZE = 5
 
@@ -18,19 +18,37 @@ export default function TrainerStudents() {
   const [sortBy, setSortBy] = useState('name')
   const [page, setPage] = useState(1)
   const [toDelete, setToDelete] = useState(null)
+  // FIXED: the course filter dropdown listed mockCourses (fake names), so
+  // real courses created by trainers/admins could never be filtered on.
+  const [courses, setCourses] = useState([])
+
+  // FIXED: was a request on every keystroke, and an older slow response
+  // could overwrite a newer one. Debounce the search + ignore stale replies.
+  const [debouncedSearch, setDebouncedSearch] = useState(search)
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
 
   const load = async () => {
     setState({ loading: true, error: null, students: [] })
     try {
-      const students = await studentService.getAllStudents({ search, course, sortBy })
+      const students = await studentService.getAllStudents({ search: debouncedSearch, course, sortBy })
       setState({ loading: false, error: null, students })
     } catch {
       setState({ loading: false, error: 'Unable to load students.', students: [] })
     }
   }
 
-  useEffect(() => { load() }, [search, course, sortBy])
-  useEffect(() => { setPage(1) }, [search, course, sortBy])
+  useEffect(() => { load() }, [debouncedSearch, course, sortBy])
+  useEffect(() => { setPage(1) }, [debouncedSearch, course, sortBy])
+
+  useEffect(() => {
+    courseService
+      .getAllCourses()
+      .then((list) => setCourses(Array.isArray(list) ? list : []))
+      .catch((err) => console.error('Failed to load courses for filter:', err?.message))
+  }, [])
 
   const handleDelete = async () => {
     try {
@@ -88,7 +106,7 @@ export default function TrainerStudents() {
           <div className="col-md-4">
             <select className="form-select" value={course} onChange={(e) => setCourse(e.target.value)}>
               <option value="">All Courses</option>
-              {mockCourses.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+              {courses.map((c) => <option key={c._id ?? c.id} value={c.name}>{c.name}</option>)}
             </select>
           </div>
           <div className="col-md-3">

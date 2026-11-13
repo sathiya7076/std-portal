@@ -6,6 +6,9 @@ import { getImageUrl } from "../../services/imageurl"; // ADDED
 const CourseList = () => {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  // ADDED: visible error message (failures were only console.error'd, so a
+  // failed save/delete looked like "nothing happened")
+  const [actionError, setActionError] = useState("");
 
   // ADDED: state for inline edit
   const [editingId, setEditingId] = useState(null);
@@ -25,9 +28,10 @@ const CourseList = () => {
   const fetchCourses = async () => {
     try {
       const data = await courseService.getAllCourses();
-      setCourses(data);
+      setCourses(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to fetch courses:", err.response?.data || err.message);
+      setActionError("Failed to load courses.");
     } finally {
       setLoading(false);
     }
@@ -35,11 +39,12 @@ const CourseList = () => {
 
   // ADDED: start editing a course row
   const handleEditClick = (course) => {
+    setActionError("");
     setEditingId(course._id || course.id);
     setEditFormData({
       name: course.name || "",
       duration: course.duration || "",
-      fees: course.fees || "",
+      fees: course.fees ?? "", // FIXED: `|| ""` turned a fee of 0 into an empty field
       status: course.status || "active",
     });
   };
@@ -57,13 +62,28 @@ const CourseList = () => {
 
   // ADDED: save edited course
   const handleEditSave = async (courseId) => {
+    // FIXED: blank name / invalid fee was sent straight to the backend
+    if (!editFormData.name.trim()) {
+      setActionError("Course name is required.");
+      return;
+    }
+    if (editFormData.fees === "" || Number.isNaN(Number(editFormData.fees))) {
+      setActionError("Please enter a valid fee amount.");
+      return;
+    }
+
     setSavingEdit(true);
+    setActionError("");
     try {
-      await courseService.updateCourse(courseId, editFormData);
+      await courseService.updateCourse(courseId, {
+        ...editFormData,
+        fees: Number(editFormData.fees),
+      });
       setEditingId(null);
       await fetchCourses();
     } catch (err) {
       console.error("Failed to update course:", err.response?.data || err.message);
+      setActionError(err.response?.data?.message || "Failed to update course.");
     } finally {
       setSavingEdit(false);
     }
@@ -75,11 +95,13 @@ const CourseList = () => {
       return;
     }
     setDeletingId(courseId);
+    setActionError("");
     try {
       await courseService.deleteCourse(courseId);
       await fetchCourses();
     } catch (err) {
       console.error("Failed to delete course:", err.response?.data || err.message);
+      setActionError(err.response?.data?.message || "Failed to delete course.");
     } finally {
       setDeletingId(null);
     }
@@ -89,6 +111,12 @@ const CourseList = () => {
     <Layout breadcrumb={['Trainer', 'Courses']}> {/* ADDED: wraps page with sidebar/layout */}
       <div style={{ padding: "1rem" }}>
         <h2 style={{ marginBottom: "1rem" }}>All Courses</h2>
+
+        {actionError && (
+          <div className="alert alert-danger py-2 small" role="alert">
+            {actionError}
+          </div>
+        )}
 
         {loading ? (
           <p>Loading courses...</p>

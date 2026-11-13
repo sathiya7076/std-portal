@@ -169,10 +169,12 @@ export default function TrainerDashboard() {
         <ErrorMessage message={state.error} onRetry={load} />
       )}
       {!state.loading && !state.error && state.students.length === 0 && (
+        // FIXED: every other page passes `message=` to EmptyState; this one
+        // passed `description=`, so the helper text never appeared.
         <EmptyState
           icon="bi-people"
           title="No students registered yet"
-          description="Register a student to start tracking their progress."
+          message="Register a student to start tracking their progress."
         />
       )}
 

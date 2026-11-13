@@ -9,6 +9,23 @@ const initialForm = {
   name: '', email: '', phone: '', address: '', course: '', password: '', joiningDate: '',
 }
 
+// FIXED: the old extraction was
+//   Array.isArray(data) ? data : (data?.data ?? data?.courses ?? data?.data?.courses ?? [])
+// If the API replies { data: { courses: [...] } }, `data?.data` is a truthy
+// OBJECT, so `??` stopped there and `courses` became an object — then
+// `courses.map` / `courses.find` crashed. Pick the first candidate that is
+// really an array instead.
+const extractList = (payload) => {
+  if (Array.isArray(payload)) return payload
+  const candidates = [
+    payload?.data,
+    payload?.courses,
+    payload?.data?.courses,
+    payload?.data?.data,
+  ]
+  return candidates.find(Array.isArray) ?? []
+}
+
 export default function AddStudent() {
   const [form, setForm] = useState(initialForm)
   const [errors, setErrors] = useState({})
@@ -55,10 +72,7 @@ export default function AddStudent() {
     setCourseLoadError('')
     try {
       const { data } = await api.get('/courses')
-      const list = Array.isArray(data)
-        ? data
-        : (data?.data ?? data?.courses ?? data?.data?.courses ?? [])
-      setCourses(list)
+      setCourses(extractList(data)) // FIXED: always an array now
     } catch (err) {
       // Do NOT fall back to mock course names here — submitting with a
       // fake courseId is exactly the bug we're fixing. Block submission

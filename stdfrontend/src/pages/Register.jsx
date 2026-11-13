@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import { Link } from 'react-router-dom'
+import authService from '../services/authService'
 
 export default function Register() {
   const [name, setName] = useState('')
@@ -11,9 +11,9 @@ export default function Register() {
   const [errors, setErrors] = useState({})
   const [serverError, setServerError] = useState('')
   const [loading, setLoading] = useState(false)
-
-  const { register } = useAuth()
-  const navigate = useNavigate()
+  // ADDED: trainer accounts now need admin approval, so after a successful
+  // registration we show a "pending approval" screen instead of logging in.
+  const [submitted, setSubmitted] = useState(false)
 
   const validate = () => {
     const next = {}
@@ -33,13 +33,36 @@ export default function Register() {
     if (!validate()) return
     setLoading(true)
     try {
-      const user = await register({ name, email, password, role: 'trainer', phone })
-      navigate(`/${user.role}/dashboard`)
+      // CHANGED: was `useAuth().register(...)` followed by
+      // navigate(`/${user.role}/dashboard`). The backend no longer returns a
+      // token for trainers (they are "pending" until an admin approves), so
+      // auto-login after register would break. authService.register is the
+      // same call AddStudent.jsx already uses and does not log anyone in.
+      await authService.register({ name, email, password, role: 'trainer', phone })
+      setSubmitted(true)
     } catch (err) {
       setServerError(err?.response?.data?.message || 'Registration failed. Please try again.')
     } finally {
       setLoading(false)
     }
+  }
+
+  // ADDED: pending-approval screen
+  if (submitted) {
+    return (
+      <div className="login-page">
+        <div className="login-card text-center">
+          <span className="brand-mark d-inline-flex mb-3" style={{ width: 46, height: 46, fontSize: '1.2rem' }}>S</span>
+          <h4 className="font-display fw-bold mb-2">Registration submitted</h4>
+          <div className="alert alert-success py-2 small text-start" role="alert">
+            <i className="bi bi-check-circle me-2"></i>
+            Your trainer account has been created and is <strong>waiting for admin approval</strong>.
+            You can log in once an admin approves your request.
+          </div>
+          <Link to="/login" className="btn btn-primary-stms w-100 py-2">Go to Login</Link>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -48,7 +71,7 @@ export default function Register() {
         <div className="text-center mb-4">
           <span className="brand-mark d-inline-flex mb-3" style={{ width: 46, height: 46, fontSize: '1.2rem' }}>S</span>
           <h4 className="font-display fw-bold mb-1">Create your trainer account</h4>
-          <p className="text-muted small mb-0">Sign up to get started</p>
+          <p className="text-muted small mb-0">Sign up to get started (admin approval required)</p>
         </div>
 
         {serverError && (
