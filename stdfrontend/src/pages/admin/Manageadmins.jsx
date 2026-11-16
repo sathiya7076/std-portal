@@ -18,10 +18,10 @@ export default function ManageAdmins() {
 
   const load = useCallback(async () => {
     try {
-      const d = await adminService.getAdmins();
-      setAdmins(d.admins);
-    } catch (e) {
-      setMsg({ type: "danger", text: errMsg(e) });
+      const data = await adminService.getAdmins();
+      setAdmins(data.admins);
+    } catch (error) {
+      setMsg({ type: "danger", text: errMsg(error) });
     }
   }, []);
 
@@ -29,38 +29,39 @@ export default function ManageAdmins() {
     load();
   }, [load]);
 
-  const change = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const change = (event) =>
+    setForm({ ...form, [event.target.name]: event.target.value });
 
-  const submit = async (e) => {
-    e.preventDefault();
+  const submit = async (event) => {
+    event.preventDefault();
     try {
       await adminService.createAdmin(form);
       setMsg({ type: "success", text: "Admin created" });
       setForm(EMPTY);
       setShowForm(false);
       load();
-    } catch (err) {
-      setMsg({ type: "danger", text: errMsg(err) });
+    } catch (error) {
+      setMsg({ type: "danger", text: errMsg(error) });
     }
   };
 
-  const toggle = async (a) => {
+  const toggle = async (admin) => {
     try {
-      await adminService.toggleUserStatus(a._id);
+      await adminService.toggleUserStatus(admin._id);
       load();
-    } catch (err) {
-      setMsg({ type: "danger", text: errMsg(err) });
+    } catch (error) {
+      setMsg({ type: "danger", text: errMsg(error) });
     }
   };
 
-  const remove = async (a) => {
-    if (!window.confirm(`Delete admin ${a.name}?`)) return;
+  const remove = async (admin) => {
+    if (!window.confirm(`Delete admin ${admin.name}?`)) return;
     try {
-      await adminService.deleteUser(a._id);
+      await adminService.deleteUser(admin._id);
       setMsg({ type: "success", text: "Admin deleted" });
       load();
-    } catch (err) {
-      setMsg({ type: "danger", text: errMsg(err) });
+    } catch (error) {
+      setMsg({ type: "danger", text: errMsg(error) });
     }
   };
 
@@ -68,7 +69,10 @@ export default function ManageAdmins() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h3 className="mb-0">Admins</h3>
-        <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
+        <button
+          className="btn btn-primary"
+          onClick={() => setShowForm(!showForm)}
+        >
           {showForm ? "Close" : "+ Add Admin"}
         </button>
       </div>
@@ -164,33 +168,33 @@ export default function ManageAdmins() {
               </tr>
             </thead>
             <tbody>
-              {admins.map((a) => (
-                <tr key={a._id}>
+              {admins.map((admin) => (
+                <tr key={admin._id}>
                   <td>
-                    <div className="fw-semibold">{a.name}</div>
-                    <div className="small text-muted">{a.email}</div>
+                    <div className="fw-semibold">{admin.name}</div>
+                    <div className="small text-muted">{admin.email}</div>
                   </td>
-                  <td>{a.designation || "-"}</td>
-                  <td>{a.department || "-"}</td>
-                  <td>{a.phone || "-"}</td>
+                  <td>{admin.designation || "-"}</td>
+                  <td>{admin.department || "-"}</td>
+                  <td>{admin.phone || "-"}</td>
                   <td>
                     <span
-                      className={`badge ${a.isActive ? "bg-success" : "bg-secondary"}`}
+                      className={`badge ${admin.isActive ? "bg-success" : "bg-secondary"}`}
                     >
-                      {a.isActive ? "active" : "inactive"}
+                      {admin.isActive ? "active" : "inactive"}
                     </span>
                   </td>
                   <td className="text-end">
                     <div className="btn-group btn-group-sm">
                       <button
                         className="btn btn-outline-secondary"
-                        onClick={() => toggle(a)}
+                        onClick={() => toggle(admin)}
                       >
-                        {a.isActive ? "Deactivate" : "Activate"}
+                        {admin.isActive ? "Deactivate" : "Activate"}
                       </button>
                       <button
                         className="btn btn-outline-danger"
-                        onClick={() => remove(a)}
+                        onClick={() => remove(admin)}
                       >
                         Delete
                       </button>

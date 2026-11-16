@@ -1,37 +1,21 @@
-import { Route, Navigate } from "react-router-dom";
-import AdminRoute from "../../components/admin/AdminRoute";
-import AdminLayout from "./AdminLayout";
-import AdminDashboard from "./AdminDashboard";
-import ManageTrainers from "./ManageTrainers";
-import ManageStudents from "./ManageStudents";
-import ManageCourses from "./ManageCourses";
-import ManageAdmins from "./ManageAdmins";
+import { Navigate, Outlet } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
-/**
- * All admin routes in one place.
- *
- * In App.jsx:
- *   import adminRoutes from "./pages/admin/adminRoutes";
- *   ...
- *   <Routes>
- *     ...your existing routes...
- *     {adminRoutes}
- *   </Routes>
- *
- * Put {adminRoutes} directly inside <Routes> (NOT inside your student/trainer
- * ProtectedRoute wrapper), otherwise that wrapper may reject the admin role.
- */
-const adminRoutes = (
-  <Route path="/admin" element={<AdminRoute />}>
-    <Route element={<AdminLayout />}>
-      <Route index element={<Navigate to="dashboard" replace />} />
-      <Route path="dashboard" element={<AdminDashboard />} />
-      <Route path="trainers" element={<ManageTrainers />} />
-      <Route path="students" element={<ManageStudents />} />
-      <Route path="courses" element={<ManageCourses />} />
-      <Route path="admins" element={<ManageAdmins />} />
-    </Route>
-  </Route>
-);
+export default function AdminRoute() {
+  const { user, loading } = useAuth();
 
-export default adminRoutes;
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center vh-100">
+        <div className="spinner-border" role="status" />
+      </div>
+    );
+  }
+
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== "admin") {
+    return <Navigate to={`/${user.role}/dashboard`} replace />;
+  }
+
+  return <Outlet />;
+}

@@ -327,7 +327,7 @@ const getAdmins = asyncHandler(async (req, res) => {
   return sendSuccess(res, 200, "Admins fetched", { count: admins.length, admins });
 });
 
-// @route   POST /api/admin/admins     (existing admin creates another admin)
+// @route   POST /api/admin/admins
 const createAdmin = asyncHandler(async (req, res) => {
   const { name, email, password, phone, designation, department } = req.body;
 
@@ -335,12 +335,14 @@ const createAdmin = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Name, email and password are required");
   }
 
-  const existing = await User.findOne({ email: email.toLowerCase() });
-  if (existing) throw new ApiError(409, "A user with this email already exists");
+  const normalizedEmail = email.trim().toLowerCase();
+  if (await User.findOne({ email: normalizedEmail })) {
+    throw new ApiError(409, "A user with this email already exists");
+  }
 
   const admin = await User.create({
     name,
-    email,
+    email: normalizedEmail,
     password,
     phone,
     designation,

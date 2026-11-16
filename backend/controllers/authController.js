@@ -97,56 +97,6 @@ const register = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Register a new admin (protected by ADMIN_SECRET_KEY in .env)
-// @route   POST /api/auth/register-admin
-// @access  Public (but needs the secret key)
-const registerAdmin = asyncHandler(async (req, res) => {
-  const { name, email, password, phone, designation, department, adminSecret } =
-    req.body;
-
-  if (
-    !process.env.ADMIN_SECRET_KEY ||
-    adminSecret !== process.env.ADMIN_SECRET_KEY
-  ) {
-    throw new ApiError(403, "Invalid admin secret key");
-  }
-
-  if (!name || !email || !password) {
-    throw new ApiError(400, "Name, email and password are required");
-  }
-
-  const existingUser = await User.findOne({ email: email.toLowerCase() });
-  if (existingUser) {
-    throw new ApiError(409, "A user with this email already exists");
-  }
-
-  const admin = await User.create({
-    name,
-    email,
-    password,
-    phone,
-    designation,
-    department,
-    role: "admin",
-    approvalStatus: "approved",
-  });
-
-  const token = generateToken(admin._id, admin.role);
-
-  return sendSuccess(res, 201, "Admin registered successfully", {
-    token,
-    user: {
-      id: admin._id,
-      name: admin.name,
-      email: admin.email,
-      role: admin.role,
-      phone: admin.phone,
-      designation: admin.designation,
-      department: admin.department,
-    },
-  });
-});
-
 // @desc    Login user
 // @route   POST /api/auth/login
 // @access  Public
@@ -251,4 +201,4 @@ const getMe = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { register, registerAdmin, login, getMe };
+module.exports = { register, login, getMe };

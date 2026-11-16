@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 
 // Dashboard link is /admin/dashboard, because Login.jsx redirects with
 // navigate(`/${user.role}/dashboard`) => /admin/dashboard.
