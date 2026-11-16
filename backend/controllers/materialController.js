@@ -1,4 +1,5 @@
 const asyncHandler = require("express-async-handler");
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const mongoose = require("mongoose");
@@ -10,6 +11,7 @@ const ApiError = require("../utils/ApiError");
 const { sendSuccess } = require("../utils/apiResponse");
 const { getPagination, buildMeta } = require("../utils/paginate");
 const { createBulkNotifications } = require("../services/notificationService");
+const { getCloudinary } = require("../config/cloudinary");
 
 // Deletes a just-uploaded file from disk. Used to clean up orphaned
 // uploads when validation fails AFTER multer has already saved the file.
@@ -184,6 +186,94 @@ const createMaterial = asyncHandler(async (req, res) => {
   return sendSuccess(res, 201, "Material uploaded successfully", material);
 });
 
+// @route   POST /api/materials/video-upload-signature
+const createVideoUploadSignature = asyncHandler(async (req, res) => {
+  const trainer = await Trainer.findOne({ userId: req.user._id });
+  if (!trainer) throw new ApiError(404, "Trainer profile not found");
+
+  const { cloudinary, cloudName, apiKey, apiSecret } = getCloudinary();
+  const publicId = `stms-material-${crypto.randomBytes(16).toString("hex")}`;
+  const timestamp = Math.floor(Date.now() / 1000);
+  const signature = cloudinary.utils.api_sign_request(
+    { public_id: publicId, timestamp },
+    apiSecret
+  );
+
+  return sendSuccess(res, 200, "Video upload signature created", {
+    cloudName,
+    apiKey,
+    publicId,
+    timestamp,
+    signature,
+  });
+});
+
+// @route   POST /api/materials/video
+const createCloudinaryVideoMaterial = asyncHandler(async (req, res) => {
+  const { title, description, courseId, publicId } = req.body;
+
+  if (!title || !courseId || !publicId) {
+    throw new ApiError(400, "title, courseId, and publicId are required");
+  }
+  if (!/^stms-material-[a-f0-9]{32}$/.test(publicId)) {
+    throw new ApiError(400, "Invalid video upload reference");
+  }
+  if (!mongoose.isValidObjectId(courseId)) {
+    throw new ApiError(400, "Invalid courseId");
+  }
+
+  const [course, trainer] = await Promise.all([
+    Course.findById(courseId),
+    Trainer.findOne({ userId: req.user._id }),
+  ]);
+  if (!course) throw new ApiError(404, "Course not found");
+  if (!trainer) throw new ApiError(404, "Trainer profile not found");
+
+  const { cloudinary } = getCloudinary();
+  const uploadedVideo = await cloudinary.api.resource(publicId, {
+    resource_type: "video",
+  });
+
+  if (!uploadedVideo.secure_url || uploadedVideo.public_id !== publicId) {
+    throw new ApiError(400, "Uploaded video could not be verified");
+  }
+
+  const material = await Material.create({
+    title,
+    description,
+    courseId,
+    type: "VIDEO",
+    fileName: `${publicId}.${uploadedVideo.format || "video"}`,
+    fileUrl: uploadedVideo.secure_url,
+    cloudinaryPublicId: publicId,
+    uploadedBy: trainer._id,
+  });
+
+  try {
+    const studentsInCourse = await Student.find({ courseId }).populate(
+      "userId",
+      "_id"
+    );
+    const userIds = studentsInCourse
+      .filter((student) => student.userId)
+      .map((student) => student.userId._id);
+
+    if (userIds.length > 0) {
+      await createBulkNotifications({
+        userIds,
+        type: "material",
+        title: "New Study Material Added",
+        message: `New material "${material.title}" was added to your course.`,
+        relatedId: material._id,
+      });
+    }
+  } catch (notifyErr) {
+    console.error("Failed to send material notifications:", notifyErr);
+  }
+
+  return sendSuccess(res, 201, "Video material uploaded successfully", material);
+});
+
 // @desc    Update material metadata (and optionally replace file)
 // @route   PUT /api/materials/:id
 // @access  Private (trainer only - must own it)
@@ -212,6 +302,13 @@ const updateMaterial = asyncHandler(async (req, res) => {
   }
 
   if (req.file) {
+    if (material.cloudinaryPublicId) {
+      const { cloudinary } = getCloudinary();
+      await cloudinary.uploader.destroy(material.cloudinaryPublicId, {
+        resource_type: "video",
+      });
+      material.cloudinaryPublicId = undefined;
+    }
     removeDiskFile(material.fileUrl);
     material.fileName = req.file.originalname;
     if (req.file.buffer) {
@@ -240,7 +337,14 @@ const deleteMaterial = asyncHandler(async (req, res) => {
     throw new ApiError(403, "You can only delete your own materials");
   }
 
-  removeDiskFile(material.fileUrl);
+  if (material.cloudinaryPublicId) {
+    const { cloudinary } = getCloudinary();
+    await cloudinary.uploader.destroy(material.cloudinaryPublicId, {
+      resource_type: "video",
+    });
+  } else {
+    removeDiskFile(material.fileUrl);
+  }
 
   await Material.deleteOne({ _id: material._id });
 
@@ -252,6 +356,8 @@ module.exports = {
   getMaterials,
   getMaterialById,
   createMaterial,
+  createVideoUploadSignature,
+  createCloudinaryVideoMaterial,
   updateMaterial,
   deleteMaterial,
 };

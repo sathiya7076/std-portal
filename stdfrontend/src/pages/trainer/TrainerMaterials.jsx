@@ -113,6 +113,7 @@ export default function TrainerMaterials() {
     } catch (err) {
       setUploadError(
         err?.response?.data?.message ||
+        err?.response?.data?.error?.message ||
         (err?.code === 'ECONNABORTED'
           ? 'The upload took too long. Check your connection and try again.'
           : 'Failed to upload material. Please try again.')

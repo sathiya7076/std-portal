@@ -1,3 +1,4 @@
+import axios from 'axios'
 import api, { mockDelay } from './api'
 import { mockMaterials } from '../mock/mockData'
 
@@ -43,6 +44,35 @@ const materialService = {
     if (USE_MOCK) {
       return mockDelay({ ...payload, id: `m${Date.now()}`, uploadedDate: new Date().toISOString().slice(0, 10) }, 900)
     }
+
+    if (payload.format === 'video' && !import.meta.env.DEV) {
+      const signatureResponse = await api.post('/materials/video-upload-signature')
+      const signature = extractData(signatureResponse.data)
+      const uploadData = new FormData()
+      uploadData.append('file', payload.file)
+      uploadData.append('api_key', signature.apiKey)
+      uploadData.append('timestamp', String(signature.timestamp))
+      uploadData.append('public_id', signature.publicId)
+      uploadData.append('signature', signature.signature)
+
+      await axios.post(
+        `https://api.cloudinary.com/v1_1/${encodeURIComponent(signature.cloudName)}/video/upload`,
+        uploadData,
+        {
+          timeout: 5 * 60 * 1000,
+          onUploadProgress: payload.onUploadProgress,
+        }
+      )
+
+      const { data } = await api.post('/materials/video', {
+        courseId: payload.courseId,
+        title: payload.title,
+        description: payload.description,
+        publicId: signature.publicId,
+      })
+      return extractData(data)
+    }
+
     const formData = new FormData()
     formData.append('courseId', payload.courseId)
     formData.append('title', payload.title)

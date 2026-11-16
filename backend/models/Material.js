@@ -25,6 +25,7 @@ const materialSchema = new mongoose.Schema(
       type: String,
       // set right after create when the file is stored in the database
     },
+    cloudinaryPublicId: { type: String },
     // ADDED: file bytes for read-only hosts (Vercel). select:false keeps them out
     // of list responses; served by GET /api/materials/:id/file.
     fileBuffer: { type: Buffer, select: false },

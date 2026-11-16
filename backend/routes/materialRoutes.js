@@ -4,6 +4,8 @@ const {
   getMaterials,
   getMaterialById,
   createMaterial,
+  createVideoUploadSignature,
+  createCloudinaryVideoMaterial,
   updateMaterial,
   deleteMaterial,
 } = require("../controllers/materialController");
@@ -19,6 +21,12 @@ router.get("/:id/file", getMaterialFile);
 router.use(protect);
 
 router.get("/", getMaterials); // both roles
+router.post(
+  "/video-upload-signature",
+  requireRole("trainer"),
+  createVideoUploadSignature
+);
+router.post("/video", requireRole("trainer"), createCloudinaryVideoMaterial);
 router.post(
   "/",
   requireRole("trainer"),
